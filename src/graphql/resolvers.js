@@ -16,6 +16,11 @@ const resolvers = {
         person: (_, {name}) => {
             const ps = new context.People();
             return ps.findPerson(name);
+        },
+        // pages 조회
+        pages: (_, {srchType, srchWord, pnum, sname, sage, saddr}) => {
+            const pages = new context.Pages();
+            return pages.retrieveData(srchType, srchWord, pnum, sname, sage, saddr);
         }
     },
     Mutation: {
