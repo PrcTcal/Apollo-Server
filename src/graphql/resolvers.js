@@ -21,6 +21,10 @@ const resolvers = {
         pages: (_, {srchType, srchWord, pnum, sname, sage, saddr}) => {
             const pages = new context.Pages();
             return pages.retrieveData(srchType, srchWord, pnum, sname, sage, saddr);
+        },
+        music: () => {
+            const music = new context.Music();
+            return music.findMusic();
         }
     },
     Mutation: {
@@ -46,6 +50,14 @@ const resolvers = {
         removePerson: (_, {name}) => {
             const person = new context.People();
             return person.removePerson(name);
+        },
+        addMusic: (_, {artist, song}) => {
+            const music = new context.Music();
+            return music.addMusic(artist, song);
+        },
+        updateMusic: (_, {artist, song}) => {
+            const music = new context.Music();
+            return music.updateMusic(artist, song);
         }
     }
 };

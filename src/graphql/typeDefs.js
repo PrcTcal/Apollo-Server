@@ -25,11 +25,17 @@ const typeDefs = gql`
         addr : String!
     }
 
+    type Music{
+        Artist: String!
+        songTitle: String!
+    }
+
     type Query{
         movies:[Movie!]!
         movie(id:Int!):Movie
         people:[People!]!
         person(name:String!):People
+        music:[Music]
         pages(srchType:String, srchWord:String, pnum:Int!, sname:Int, sage:Int, saddr:Int):[Pages!]!
     }
 
@@ -38,6 +44,9 @@ const typeDefs = gql`
         addPerson(name: String!, age: Int!, score: Int, skills: [String]) : People!
         updateAge(name: String!, age: Int!) : People!
         removePerson(name:String!):People!
+        addMusic(artist:String!, song:String!): Music
+        updateMusic(name:String!, song:String!): Music
+        deleteMusic(name:String!, song:String!): Music
     }
 `;
 

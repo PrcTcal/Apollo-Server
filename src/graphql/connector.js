@@ -1,5 +1,7 @@
 const PeopleModel = require('../database/mongo');
 const PagesModel = require('../database/pages');
+const MusicModel = require('../database/music');
+const dynamoose = require('dynamoose');
 class People{
     constructor(){
         this.findPeople = () => {
@@ -89,4 +91,33 @@ class Pages{
     }
 }
 
-module.exports = {People, Pages};
+class Music{
+    constructor(){
+        this.findMusic = () => {
+            const music = MusicModel.scan({}, (err, result) => {
+                if(err) console.error(err);
+                return;
+            }).exec();
+            return music;
+        }
+
+        this.addMusic = async (artist, song) => {
+            let music;
+            try{
+                music = await MusicModel.create({'Artist':artist, 'songTitle':song});
+                console.log(music);
+            } catch(err){
+                console.error(err);
+            }
+            return music;
+        }
+
+        this.updateMusic = (artist, song) => {
+            const music = MusicModel.update({'Artist':artist}, {'songTitle':song});
+            console.log(music);
+            return music;
+        }
+    }
+}
+
+module.exports = {People, Pages, Music};
