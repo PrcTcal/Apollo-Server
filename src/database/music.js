@@ -1,6 +1,9 @@
+/********************* Dynamoose  **************************/
+
 const Dynamoose = require('dynamoose');
 
 const schema = new Dynamoose.Schema({
+    id: String,
     Artist: String,
     songTitle: String
 });

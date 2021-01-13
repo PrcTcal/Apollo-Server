@@ -23,7 +23,7 @@ const server = new ApolloServer({
 Mongoose.Promise = global.Promise;
 
 //AWS 연결 세팅
-//AWS.config.update(config.aws_remote_config);
+AWS.config.update(config.aws_remote_config);
 /*
 AWS.config.getCredentials(function(err) {
     if (err) console.log(err.stack);
@@ -35,11 +35,11 @@ AWS.config.getCredentials(function(err) {
 */
 
 // Create the DynamoDB service object
-//var ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
-var ddb = new dynamoose.aws.sdk.DynamoDB(config.aws_remote_config);
+var ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 
 // Dynamoose 연결 세팅
-dynamoose.aws.ddb.set(ddb);
+//var ddb = new dynamoose.aws.sdk.DynamoDB(config.aws_remote_config);
+//dynamoose.aws.ddb.set(ddb);
 
 /* Call DynamoDB to retrieve the list of tables
 ddb.listTables({}, function(err, data) {

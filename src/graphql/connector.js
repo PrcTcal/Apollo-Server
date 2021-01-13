@@ -2,6 +2,9 @@ const PeopleModel = require('../database/mongo');
 const PagesModel = require('../database/pages');
 const MusicModel = require('../database/music');
 const dynamoose = require('dynamoose');
+const config = require('../config/config.js');
+const AWS = require('aws-sdk');
+const uuid = require('uuid');
 class People{
     constructor(){
         this.findPeople = () => {
@@ -93,18 +96,18 @@ class Pages{
 
 class Music{
     constructor(){
-        this.findMusic = () => {
-            const music = MusicModel.scan({}, (err, result) => {
-                if(err) console.error(err);
-                return;
-            }).exec();
-            return music;
+        /********************* Dynamoose CRUD *************************************/
+        this.findMusic = async (pnum) => {
+            const music = await MusicModel.scan().limit(3 * (pnum - 1)).exec();
+            const result = await MusicModel.scan().startAt(music.lastKey).limit().exec();
+            console.log(result);
+            return result;
         }
 
         this.addMusic = async (artist, song) => {
             let music;
             try{
-                music = await MusicModel.create({'Artist':artist, 'songTitle':song});
+                music = await MusicModel.create({'id':uuid.v4(), 'Artist':artist, 'songTitle':song});
                 console.log(music);
             } catch(err){
                 console.error(err);
@@ -112,10 +115,137 @@ class Music{
             return music;
         }
 
-        this.updateMusic = (artist, song) => {
-            const music = MusicModel.update({'Artist':artist}, {'songTitle':song});
-            console.log(music);
+        this.updateMusic = async (artist, song, title) => {
+            let entity, music;
+            try{
+                entity = await MusicModel.scan({'Artist':artist, 'songTitle':song}).exec();
+                music = await MusicModel.update({'id':entity[0].id}, {"$SET": {'songTitle':title}});
+                console.log('update success!');
+            } catch(err) {
+                console.error(err);
+            }
             return music;
+        }
+
+        this.deleteMusic = async (artist, song) => {
+            let music;
+            const entity = await MusicModel.scan({'Artist':artist, 'songTitle':song}).exec();
+            if(entity != null){
+                music = MusicModel.delete(entity[0].id, (err) => {
+                    if(err) console.error(err);
+                    return;
+                });
+            }
+            return entity[0];
+        }
+
+        /************************ AWS_SDK CRUD ***********************************/
+        this.sdkMusic = () => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let params = {
+                    TableName: config.aws_table_name
+                };
+                docClient.scan(params, function(err, data) {
+                    if (err) {
+                      return reject(err);
+                    } else {
+                        console.log(data);
+                      return resolve(data['Items']);
+                    }
+                });
+            });
+        }
+
+        this.addSdkMusic = (artist, song) => {
+            return new Promise(async (resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let params = {
+                    TableName: config.aws_table_name,
+                    Item: {
+                        id: uuid.v4(),
+                        Artist: artist,
+                        songTitle: song
+                    }
+                };
+                console.log(params);
+                docClient.put(params, (err, result) => {
+                    if(err){
+                        return reject(err);
+                    } else {
+                        return resolve(result['Item']);
+                    }
+                });
+                
+            });
+        }
+
+        this.updateSdkMusic = (artist, song, title) => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let targetId;
+                let params = {
+                    TableName: config.aws_table_name
+                }
+                docClient.scan(params, (err, result) => {
+                    if(err){
+                        console.error(err);
+                    } else {
+                        for(let item of result['Items']){
+                            if(item.songTitle == song && item.Artist == artist){
+                                targetId = item.id;
+                                console.log('targetId : ' + targetId);
+                            }
+                        }
+                        params = {
+                            TableName: config.aws_table_name,
+                            Key: {
+                                "id": targetId
+                            },
+                            UpdateExpression: "set songTitle = :s",
+                            ExpressionAttributeValues:{
+                                ":s" : title
+                            }
+                        };
+                        docClient.update(params, (err, data) => {
+                            if(err){
+                                return reject(err);
+                            } else {
+                                return resolve(data);
+                            }
+                        });
+                    }
+                });   
+            });
+        }
+
+        this.deleteSdkMusic = async (artist, song) => {
+            AWS.config.update(config.aws_remote_config);
+            let docClient = new AWS.DynamoDB.DocumentClient();
+            let targetId;
+            let params = {
+                TableName: config.aws_table_name
+            }
+            const music = await docClient.scan(params);
+            console.log(music);
+            for(let item of result['Items']){
+                if(item.Artist == artist && item.songTitle == song){
+                    targetId = item.id;
+                    console.log(targetId);
+                }
+            }
+            params = {
+                TableName: config.aws_table_name,
+                Key: {
+                    "id": targetId
+                }
+            };
+            const rs = await docClient.delete(params);
+            console.log(rs);
+            return rs;
         }
     }
 }

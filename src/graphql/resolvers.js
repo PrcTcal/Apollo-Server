@@ -22,9 +22,13 @@ const resolvers = {
             const pages = new context.Pages();
             return pages.retrieveData(srchType, srchWord, pnum, sname, sage, saddr);
         },
-        music: () => {
+        music: (_, {pnum}) => {
             const music = new context.Music();
-            return music.findMusic();
+            return music.findMusic(pnum);
+        },
+        sdkMusic: () => {
+            const music = new context.Music();
+            return music.sdkMusic();
         }
     },
     Mutation: {
@@ -55,9 +59,25 @@ const resolvers = {
             const music = new context.Music();
             return music.addMusic(artist, song);
         },
-        updateMusic: (_, {artist, song}) => {
+        updateMusic: (_, {artist, song, title}) => {
             const music = new context.Music();
-            return music.updateMusic(artist, song);
+            return music.updateMusic(artist, song, title);
+        },
+        deleteMusic: (_, {artist, song}) => {
+            const music = new context.Music();
+            return music.deleteMusic(artist, song);
+        },
+        addSdkMusic: (_, {artist, song}) => {
+            const music = new context.Music();
+            return music.addSdkMusic(artist, song);
+        },
+        updateSdkMusic: (_, {artist, song, title}) => {
+            const music = new context.Music();
+            return music.updateSdkMusic(artist, song, title);
+        },
+        deleteSdkMusic: (_, {artist, song}) => {
+            const music = new context.Music();
+            return music.deleteSdkMusic(artist, song);
         }
     }
 };
