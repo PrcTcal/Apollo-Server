@@ -1,4 +1,4 @@
 # Apollo-Server
 
 <br>
-Apollo + GraphQL + MongoDB
+Apollo + GraphQL + MongoDB + DynamoDB
