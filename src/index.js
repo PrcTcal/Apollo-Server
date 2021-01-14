@@ -69,6 +69,7 @@ docClient.scan(params, function(err, data) {
   }
 });
 */
+// test comment
 
 // ApolloServer 실행
 server.listen().then(({url}) =>{
