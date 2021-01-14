@@ -1,5 +1,6 @@
 import movies from '../database/movies';
-import context from './connector'
+import context from './connector';
+import inter from './interface';
 
 const resolvers = {
     Query: {
@@ -23,12 +24,7 @@ const resolvers = {
             return pages.retrieveData(srchType, srchWord, pnum, sname, sage, saddr);
         },
         music: (_, {pnum}) => {
-            const music = new context.Music();
-            return music.findMusic(pnum);
-        },
-        sdkMusic: () => {
-            const music = new context.Music();
-            return music.sdkMusic();
+            return inter.readMusic(pnum);
         }
     },
     Mutation: {
@@ -56,28 +52,19 @@ const resolvers = {
             return person.removePerson(name);
         },
         addMusic: (_, {artist, song}) => {
-            const music = new context.Music();
-            return music.addMusic(artist, song);
+            // const music = new context.Music();
+            // return music.addMusic(artist, song);
+            return inter.createMusic(artist, song);
         },
         updateMusic: (_, {artist, song, title}) => {
-            const music = new context.Music();
-            return music.updateMusic(artist, song, title);
+            // const music = new context.Music();
+            // return music.updateMusic(artist, song, title);
+            return inter.updateMusic(artist, song, title);
         },
         deleteMusic: (_, {artist, song}) => {
-            const music = new context.Music();
-            return music.deleteMusic(artist, song);
-        },
-        addSdkMusic: (_, {artist, song}) => {
-            const music = new context.Music();
-            return music.addSdkMusic(artist, song);
-        },
-        updateSdkMusic: (_, {artist, song, title}) => {
-            const music = new context.Music();
-            return music.updateSdkMusic(artist, song, title);
-        },
-        deleteSdkMusic: (_, {artist, song}) => {
-            const music = new context.Music();
-            return music.deleteSdkMusic(artist, song);
+            // const music = new context.Music();
+            // return music.deleteMusic(artist, song);
+            return inter.deleteMusic(artist, song);
         }
     }
 };

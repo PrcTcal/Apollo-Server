@@ -3,7 +3,8 @@ import {gql} from 'apollo-server';
 /*
 *   정의 내용
 *   객체 : mongoDB에 있는 collection 매핑
-*   Query : 
+*   Query : Read
+*   Mutation : Create, Update, Delete
 */
 const typeDefs = gql`
     type Movie{
@@ -39,7 +40,6 @@ const typeDefs = gql`
         person(name:String!):People
 
         music(pnum:Int!):[Music]
-        sdkMusic:[Music]
 
         pages(srchType:String, srchWord:String, pnum:Int!, sname:Int, sage:Int, saddr:Int):[Pages!]!
     }
@@ -50,13 +50,9 @@ const typeDefs = gql`
         updateAge(name: String!, age: Int!) : People!
         removePerson(name:String!):People!
 
-        addMusic(artist:String!, song:String!): Music
-        updateMusic(artist:String!, song:String!, title:String!): Music
-        deleteMusic(artist:String!, song:String!): Music
-
-        addSdkMusic(artist:String!, song:String!): Music
-        updateSdkMusic(artist:String!, song:String!, title:String!): Music
-        deleteSdkMusic(artist:String!, song:String!): Music
+        addMusic(artist:String!, song:String!): Boolean!
+        updateMusic(artist:String!, song:String!, title:String!): Boolean!
+        deleteMusic(artist:String!, song:String!): Boolean!
     }
 `;
 
