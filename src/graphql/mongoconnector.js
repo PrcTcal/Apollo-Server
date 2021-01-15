@@ -3,14 +3,20 @@ const uuid = require('uuid');
 
 class Mongo{
     constructor(){
-        this.readMusic = (pnum) => {
-            const pages = MusicModel.find({}, (err, data) => {
-                if(err) console.error(err);
-                console.log(data);
-                return data;
+        this.getMusic = (id, artist, song) => {
+            return new Promise((resolve, reject) => {
+                let srchType;
+                if(id){ 
+                    srchType = {"id":id};
+                } else if(artist) { 
+                    srchType = {"Artist":artist, "songTitle": song};
+                } 
+                MusicModel.find(srchType, (err, data) => {
+                    if(err) return reject(err);
+                    console.log(data[0]);
+                    return resolve(data[0]);
+                });
             });
-            pages.limit(5).skip((pnum-1) * 5).sort({'Artist':1});
-            return pages;
         }
 
         this.createMusic = (artist, song) => {
@@ -68,6 +74,31 @@ class Mongo{
                 });
             });
         }
+
+        this.searchMusic = (id, stype, dir, page, artist, song) => {
+            let music, srchType, sortType;
+            const sort = dir == 'ASC' ? 1 : -1;
+            if(id){
+                srchType = {'id':id};
+            } else if(artist){
+                srchType = {'Artist':artist};
+            } else if(song){
+                srchType = {'songTitle': song};
+            }
+           
+            if(stype == 'id'){
+                sortType = {"id": sort};
+            } else if(stype == 'Artist'){
+                sortType = {"Artist": sort};
+            } else if(stype == 'songTitle'){
+                sortType = {"songTitle": sort};
+            }
+            music = MusicModel.find(srchType);
+            
+            music.limit(5).skip((page-1) * 5).sort(sortType);
+            return music;
+        }
+
     }
 }
 

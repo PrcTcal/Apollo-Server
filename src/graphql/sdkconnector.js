@@ -5,38 +5,43 @@ const uuid = require('uuid');
 
 class SDK{
     constructor(){
-        this.readMusic = (pnum) => {
+        this.getMusic = (id, artist, song) => {
             return new Promise((resolve, reject) => {
                 AWS.config.update(config.aws_remote_config);
                 let docClient = new AWS.DynamoDB.DocumentClient();
                 let params;
-                params = {
-                    TableName: config.aws_table_name,
-                    Limit: pnum == 1 ? 5 : 5 * (pnum - 1)
-                };
-                docClient.scan(params, function(err, data) {
-                    if (err) {
+                
+                if(id){
+                    params = {
+                        TableName: config.aws_table_name,
+                        FilterExpression: "#key = :key",
+                        ExpressionAttributeNames: {
+                            "#key": "id"
+                        },
+                        ExpressionAttributeValues: {
+                            ":key": id
+                        }
+                    };
+                } else if(artist && song){
+                    params = {
+                        TableName: config.aws_table_name,
+                        FilterExpression: "#aname = :an and #bname = :bn",
+                        ExpressionAttributeNames: {
+                            "#aname": "Artist",
+                            "#bname": "songTitle"
+                        },
+                        ExpressionAttributeValues: {
+                            ":an": artist,
+                            ":bn": song
+                        }
+                    }
+                }
+                docClient.scan(params, (err, data) => {
+                    if(err){
                         return reject(err);
                     } else {
-                        if(pnum == 1){
-                            //console.log(data);
-                            return resolve(data['Items']);
-                        } else {
-                            //console.log(data);
-                            params = {
-                                TableName: config.aws_table_name,
-                                Limit: 5,
-                                ExclusiveStartKey: data['LastEvaluatedKey']
-                            }
-                            docClient.scan(params, (err, data) => {
-                                if(err){
-                                    return reject(err);
-                                } else {
-                                    //console.log(data);
-                                    return resolve(data['Items']);
-                                }
-                            });
-                        }
+                        console.log(data['Items'][0]);
+                        return resolve(data['Items'][0]);
                     }
                 });
             });
@@ -161,8 +166,82 @@ class SDK{
                         return reject(new Error("No data found"));
                     }
                 });
+            });    
+        }
+
+        this.searchMusic = (id, stype, dir, page, artist, song) => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let aName, aValue;
+                let params;
+                if(id){
+                    aName = "id";
+                    aValue = id;
+                } else if(artist){
+                    aName = "Artist";
+                    aValue = artist;
+                } else if(song){
+                    aName = "songTitle";
+                    aValue = song;
+                }
+                if(id || artist || song){
+                    params = {
+                        TableName: config.aws_table_name,
+                        FilterExpression: "#name = :nn",
+                        ExpressionAttributeNames: {
+                            "#name": aName,
+                        },
+                        ExpressionAttributeValues: {
+                            ":nn": aValue
+                        }
+                    };
+                } else {
+                    params = {
+                        TableName: config.aws_table_name
+                    };
+                }
+                
+                docClient.scan(params, function(err, data) {
+                    if (err) {
+                        return reject(err);
+                    } else {
+                        if(dir){
+                            data['Items'].sort((a, b) => {
+                                if(stype == 'id'){
+                                    if(dir == 'ASC'){
+                                        return a.id > b.id ? 1 : -1;
+                                    } else {
+                                        return a.id < b.id ? 1 : -1;
+                                    }
+                                } else if(stype == 'Artist'){
+                                    if(dir == 'ASC'){
+                                        return a.Artist > b.Artist ? 1 : -1;
+                                    } else {
+                                        return a.Artist < b.Artist ? 1 : -1;
+                                    }
+                                } else if(stype == 'songTitle'){
+                                    if(dir == 'ASC'){
+                                        return a.songTitle > b.songTitle ? 1 : -1;
+                                    } else {
+                                        return a.songTitle < b.songTitle ? 1 : -1;
+                                    }
+                                }
+                            });
+                        }
+                        if(page){
+                            let temp = new Array();
+                            let endIndex = data['Items'].length > page * 5 ? page * 5 : data['Items'].length;
+                            for(let i = (page - 1) * 5 ; i < endIndex  ; i++){
+                                temp.push(data['Items'][i]);
+                            }
+                            data['Items'] = temp;
+                        }
+                        console.log(data['Items']);
+                        return resolve(data['Items']);
+                    }
+                });
             });
-            
         }
     }
 }

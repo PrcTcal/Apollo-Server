@@ -7,7 +7,15 @@ if(config.db_select == 'dynamo'){
     const schema = new Dynamoose.Schema({
         id: String,
         Artist: String,
-        songTitle: String
+        songTitle: String,
+        hometown: String,
+        birth: String,
+        album: String,
+        release: String    
+    },
+    {
+        useDocumentTypes: true,
+        saveUnknown: true
     });
     
     music = Dynamoose.model(config.aws_table_name, schema);
@@ -17,7 +25,13 @@ if(config.db_select == 'dynamo'){
     const schema = Mongoose.Schema({
         id: String,
         Artist: String,
-        songTitle: String
+        songTitle: String,
+        info: {
+            hometown: String,
+            birth: String,
+            album: String,
+            release: String
+        }
     },
     {
         versionKey:false

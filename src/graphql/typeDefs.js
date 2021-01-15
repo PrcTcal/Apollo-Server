@@ -7,52 +7,42 @@ import {gql} from 'apollo-server';
 *   Mutation : Create, Update, Delete
 */
 const typeDefs = gql`
-    type Movie{
-        id: Int!
-        name: String!
-        rating: Int!
+    union Info = Artist | Song
+
+    type Artist{
+        hometown:String
+        birth:String
     }
 
-    type People{
-        name : String!
-        age : Int!
-        score : Int
-        skills : [String]
+    type Song{
+        album:String
+        release:String
     }
 
-    type Pages{
-        name : String!
-        age : Int!
-        addr : String!
+    enum Direction{
+        ASC
+        DESC
     }
+
 
     type Music{
         id: String!
-        Artist: String!
-        songTitle: String!
+        info: Info
+        dir: Direction
+        curPage: Int
+        Artist: String
+        songTitle: String
     }
 
     type Query{
-        movies:[Movie!]!
-        movie(id:Int!):Movie
-
-        people:[People!]!
-        person(name:String!):People
-
-        music(pnum:Int!):[Music]
-
-        pages(srchType:String, srchWord:String, pnum:Int!, sname:Int, sage:Int, saddr:Int):[Pages!]!
+        getMusic(id:String, artist:String, song:String):Music
+        searchMusic(id:String, stype:String, dir:Direction, page:Int, artist:String, song:String):[Music]
     }
 
     type Mutation{
-        addMovie(name: String!, rating: Int!) : Movie!
-        addPerson(name: String!, age: Int!, score: Int, skills: [String]) : People!
-        updateAge(name: String!, age: Int!) : People!
-        removePerson(name:String!):People!
-
-        addMusic(artist:String!, song:String!): Boolean!
+        createMusic(artist:String!, song:String!): Boolean!
         updateMusic(artist:String!, song:String!, title:String!): Boolean!
-        deleteMusic(artist:String!, song:String!): Boolean!
+        removeMusic(artist:String!, song:String!): Boolean!
     }
 `;
 

@@ -1,5 +1,4 @@
 const config = require('../config/config.js');
-//const context = require('./connector');
 const dynaConn = require('./dynaconnector');
 const sdkConn = require('./sdkconnector');
 const mongoConn = require('./mongoconnector');
@@ -19,18 +18,18 @@ function createMusic(artist, song){
     }
 }
 
-function readMusic(pnum){
+function getMusic(id, artist, song){
     if(config.db_select == 'dynamo'){
         if(config.db_mapper == 'dynamoose'){
             const music = new dynaConn.Dynamoose();
-            return music.readMusic(pnum);
+            return music.getMusic(id, artist, song);
         } else if(config.db_mapper == 'aws_sdk'){
             const music = new sdkConn.SDK();
-            return music.readMusic(pnum);
+            return music.getMusic(id, artist, song);
         }
     } else if(config.db_select == 'mongo'){
         const music = new mongoConn.Mongo();
-        return music.readMusic(pnum);
+        return music.getMusic(id, artist, song);
     }
 }
 
@@ -64,4 +63,20 @@ function deleteMusic(artist, song){
     }
 }
 
-module.exports = {createMusic, readMusic, updateMusic, deleteMusic};
+function searchMusic(id, stype, dir, page, artist, song){
+    if(config.db_select == 'mongo'){
+        const music = new mongoConn.Mongo();
+        return music.searchMusic(id, stype, dir, page, artist, song);
+    } else if(config.db_select == 'dynamo'){
+        if(config.db_mapper == 'dynamoose'){
+            const music = new dynaConn.Dynamoose();
+            return music.searchMusic(id, stype, dir, page, artist, song);
+        } else if(config.db_mapper == 'aws_sdk'){
+            const music = new sdkConn.SDK();
+            return music.searchMusic(id, stype, dir, page, artist, song);
+        }
+    }
+}
+
+
+module.exports = {createMusic, getMusic, updateMusic, deleteMusic, searchMusic};
