@@ -5,12 +5,176 @@ const uuid = require('uuid');
 
 class SDK{
     constructor(){
-        this.getMusic = (id, artist, song) => {
+        this.getMusic = (id) => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();  
+                const params = {
+                    TableName: config.aws_table_name,
+                    FilterExpression: "#key = :key",
+                    ExpressionAttributeNames: {
+                        "#key": "id"
+                    },
+                    ExpressionAttributeValues: {
+                        ":key": id
+                    }
+                };
+            
+                docClient.scan(params, (err, data) => {
+                    if(err){
+                        return reject(err);
+                    } else {
+                        return resolve(data['Items'][0]);
+                    }
+                });
+            });
+        }
+
+        this.createMusic = (Artist, songTitle, info, actv, idx) => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let params = {
+                    TableName: config.aws_table_name,
+                    FilterExpression: "#aname = :an and #bname = :bn",
+                    ExpressionAttributeNames: {
+                        "#aname": "Artist",
+                        "#bname": "songTitle"
+                    },
+                    ExpressionAttributeValues: {
+                        ":an": Artist,
+                        ":bn": songTitle
+                    }
+                }
+                docClient.scan(params, (scanerr, result) => {
+                    if(!scanerr){
+                        if(result.Count == 0){   
+                            params = {
+                                TableName: config.aws_table_name,
+                                Item: {
+                                    id: uuid.v4(),
+                                    Artist: Artist,
+                                    songTitle: songTitle,
+                                    info: info,
+                                    actv: actv,
+                                    idx: idx
+                                }
+                            };
+                            docClient.put(params, (puterr) => {
+                                if(puterr){
+                                    return reject(puterr);
+                                } else {
+                                    return resolve(true);
+                                }
+                            });
+                        } else {
+                            return reject(new Error("duplicated insertion"));
+                        }      
+                    } else {
+                        return reject(scanerr);
+                    }
+                });
+            });
+        }
+
+        this.updateMusic = (id, Artist, songTitle, info, actv, idx) => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let updFields = {};
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let params = {
+                    TableName: config.aws_table_name,
+                    FilterExpression: "#key = :key",
+                    ExpressionAttributeNames: {
+                        "#key": "id"
+                    },
+                    ExpressionAttributeValues: {
+                        ":key": id
+                    }
+                }
+                docClient.scan(params, (scanerr, result) => {
+                    if(!scanerr){
+                        if(result.Count > 0){
+                            let updExpression = '';
+                            if(Artist) {updFields[':Artist'] = Artist; updExpression += 'Artist = :Artist ';}
+                            if(songTitle) {updFields[':songTitle'] = songTitle; updExpression += updExpression != '' ? ', songTitle = :songTitle ' : 'songTitle = :songTitle '; }  
+                            if(info) {updFields[':info'] = info; updExpression += updExpression != '' ? ', info = :info ' : 'info = :info ';}
+                            if(actv != null) {updFields[':actv'] = actv; updExpression += updExpression != '' ? ', actv = :actv ' : 'actv = :actv ';}
+                            if(idx) {updFields[':idx'] = idx; updExpression += updExpression != '' ? ', idx = :idx ' : 'idx = :idx ';}
+
+                            params = {
+                                TableName: config.aws_table_name,
+                                Key: {
+                                    "id": result['Items'][0].id
+                                },
+                                UpdateExpression: "set " + updExpression
+                            };
+                            params.ExpressionAttributeValues = updFields
+
+                            docClient.update(params, (upderr) => {
+                                if(upderr){
+                                    return reject(upderr);
+                                } else {
+                                    return resolve(true);
+                                }
+                            });
+                        } else {
+                            return reject(new Error("No data found"));
+                        }
+                    } else {
+                        return reject(scanerr);
+                    }
+                });   
+            });
+        }
+
+        this.removeMusic = (id) => {
             return new Promise((resolve, reject) => {
                 AWS.config.update(config.aws_remote_config);
                 let docClient = new AWS.DynamoDB.DocumentClient();
                 let params;
+                params = {
+                    TableName: config.aws_table_name,
+                    FilterExpression: "#key = :key",
+                    ExpressionAttributeNames: {
+                        "#key": "id"
+                    },
+                    ExpressionAttributeValues: {
+                        ":key": id
+                    }
+                };
                 
+                docClient.scan(params, (scanerr, result) => {
+                    if(!scanerr){
+                        if(result.Count > 0){
+                            params = {
+                                TableName: config.aws_table_name,
+                                Key: {
+                                    "id": result['Items'][0].id
+                                }
+                            };
+                            docClient.delete(params, (delerr) => {
+                                if(delerr){
+                                    return reject(delerr);
+                                } else {
+                                    return resolve(true);
+                                }
+                            });
+                        } else {
+                            return reject(new Error("No data found"));
+                        }
+                    } else {
+                        return reject(scanerr);
+                    }       
+                });
+            });    
+        }
+
+        this.searchMusic = (id, stype, dir, page, Artist, songTitle) => {
+            return new Promise((resolve, reject) => {
+                AWS.config.update(config.aws_remote_config);
+                let docClient = new AWS.DynamoDB.DocumentClient();
+                let params;
                 if(id){
                     params = {
                         TableName: config.aws_table_name,
@@ -22,180 +186,43 @@ class SDK{
                             ":key": id
                         }
                     };
-                } else if(artist && song){
+                } else if(Artist){
+                    if(songTitle){
+                        params = {
+                            TableName: config.aws_table_name,
+                            FilterExpression: "#aname = :an and #bname = :bn",
+                            ExpressionAttributeNames: {
+                                "#aname": "Artist",
+                                "#bname": "songTitle"
+                            },
+                            ExpressionAttributeValues: {
+                                ":an": Artist,
+                                ":bn": songTitle
+                            }
+                        };
+                    } else {
+                        params = {
+                            TableName: config.aws_table_name,
+                            FilterExpression: "#aname = :an",
+                            ExpressionAttributeNames: {
+                                "#aname": "Artist"
+                            },
+                            ExpressionAttributeValues: {
+                                ":an": Artist
+                            }
+                        }
+                    }
+                } else if(songTitle){
                     params = {
                         TableName: config.aws_table_name,
-                        FilterExpression: "#aname = :an and #bname = :bn",
+                        FilterExpression: "#bname = :bn",
                         ExpressionAttributeNames: {
-                            "#aname": "Artist",
                             "#bname": "songTitle"
                         },
                         ExpressionAttributeValues: {
-                            ":an": artist,
-                            ":bn": song
+                            ":bn": songTitle
                         }
                     }
-                }
-                docClient.scan(params, (err, data) => {
-                    if(err){
-                        return reject(err);
-                    } else {
-                        console.log(data['Items'][0]);
-                        return resolve(data['Items'][0]);
-                    }
-                });
-            });
-        }
-
-        this.createMusic = (artist, song) => {
-            return new Promise((resolve, reject) => {
-                AWS.config.update(config.aws_remote_config);
-                let docClient = new AWS.DynamoDB.DocumentClient();
-                let isDup = false;
-                let params = {
-                    TableName: config.aws_table_name
-                }
-                docClient.scan(params, (err, result) => {
-                    if(err){
-                        console.error(err);
-                    } else {
-                        for(let item of result['Items']){
-                            if(item.songTitle == song && item.Artist == artist){
-                                isDup = true;
-                            }
-                        }
-                        console.log("Duplication Check : " + isDup);
-                        if(!isDup){
-                            params = {
-                                TableName: config.aws_table_name,
-                                Item: {
-                                    id: uuid.v4(),
-                                    Artist: artist,
-                                    songTitle: song
-                                }
-                            };
-                            console.log(params);
-                            docClient.put(params, (err, result) => {
-                                if(err){
-                                    console.error(err);
-                                    return reject(err);
-                                } else {
-                                    return resolve(true);
-                                }
-                            });
-                        } else {
-                            return reject(new Error("duplicated insertion"));
-                        }
-                    }
-                });
-            });
-        }
-
-        this.updateMusic = (artist, song, title) => {
-            return new Promise((resolve, reject) => {
-                AWS.config.update(config.aws_remote_config);
-                let docClient = new AWS.DynamoDB.DocumentClient();
-                let targetId;
-                let params = {
-                    TableName: config.aws_table_name
-                }
-                docClient.scan(params, (err, result) => {
-                    if(err){
-                        console.error(err);
-                    } else {
-                        for(let item of result['Items']){
-                            if(item.songTitle == song && item.Artist == artist){
-                                targetId = item.id;
-                            }
-                        }
-                        params = {
-                            TableName: config.aws_table_name,
-                            Key: {
-                                "id": targetId
-                            },
-                            UpdateExpression: "set songTitle = :s",
-                            ExpressionAttributeValues:{
-                                ":s" : title
-                            }
-                        };
-                        if(targetId != null){
-                            docClient.update(params, (err, data) => {
-                                if(err){
-                                    return reject(err);
-                                } else {
-                                    return resolve(true);
-                                }
-                            });
-                        } else {
-                            return reject(new Error("No data found"));
-                        }
-                    }
-                });   
-            });
-        }
-
-        this.deleteMusic = (artist, song) => {
-            return new Promise((resolve, reject) => {
-                AWS.config.update(config.aws_remote_config);
-                let docClient = new AWS.DynamoDB.DocumentClient();
-                let targetId;
-                let params = {
-                    TableName: config.aws_table_name
-                }
-                const music = docClient.scan(params, (err, result) => {
-                    for(let item of result['Items']){
-                        if(item.Artist == artist && item.songTitle == song){
-                            targetId = item.id;
-                        }
-                    }
-                    params = {
-                        TableName: config.aws_table_name,
-                        Key: {
-                            "id": targetId
-                        }
-                    };
-                    if(targetId != null){
-                        docClient.delete(params, (err) => {
-                            if(err){
-                                return reject(err);
-                            } else {
-                                return resolve(true);
-                            }
-                        });
-                    } else {
-                        return reject(new Error("No data found"));
-                    }
-                });
-            });    
-        }
-
-        this.searchMusic = (id, stype, dir, page, artist, song) => {
-            return new Promise((resolve, reject) => {
-                AWS.config.update(config.aws_remote_config);
-                let docClient = new AWS.DynamoDB.DocumentClient();
-                let aName, aValue;
-                let params;
-                if(id){
-                    aName = "id";
-                    aValue = id;
-                } else if(artist){
-                    aName = "Artist";
-                    aValue = artist;
-                } else if(song){
-                    aName = "songTitle";
-                    aValue = song;
-                }
-                if(id || artist || song){
-                    params = {
-                        TableName: config.aws_table_name,
-                        FilterExpression: "#name = :nn",
-                        ExpressionAttributeNames: {
-                            "#name": aName,
-                        },
-                        ExpressionAttributeValues: {
-                            ":nn": aValue
-                        }
-                    };
                 } else {
                     params = {
                         TableName: config.aws_table_name
@@ -226,6 +253,12 @@ class SDK{
                                     } else {
                                         return a.songTitle < b.songTitle ? 1 : -1;
                                     }
+                                } else if(stype == 'idx'){
+                                    if(dir == 'ASC'){
+                                        return a.idx > b.idx ? 1 : -1;
+                                    } else {
+                                        return a.idx < b.idx ? 1 : -1;
+                                    }
                                 }
                             });
                         }
@@ -237,7 +270,6 @@ class SDK{
                             }
                             data['Items'] = temp;
                         }
-                        console.log(data['Items']);
                         return resolve(data['Items']);
                     }
                 });

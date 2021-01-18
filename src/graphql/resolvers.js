@@ -13,22 +13,22 @@ const resolvers = {
         }
     },
     Query: {
-        getMusic: (_, {id, artist, song}) => {
-            return inter.getMusic(id, artist, song);
+        getMusic: (_, {id}) => {
+            return inter.getMusic(id);
         },
-        searchMusic: (_, {id, stype, dir, page, artist, song}) => {
-            return inter.searchMusic(id, stype, dir, page, artist, song);
+        searchMusic: (_, {id, stype, dir, page, Artist, songTitle}) => {
+            return inter.searchMusic(id, stype, dir, page, Artist, songTitle);
         }
     },
     Mutation: {
-        createMusic: (_, {artist, song}) => {
-            return inter.createMusic(artist, song);
+        createMusic: (_, {Artist, songTitle, info, actv, idx}) => {
+            return inter.createMusic(Artist, songTitle, info, actv, idx);
         },
-        updateMusic: (_, {artist, song, title}) => {
-            return inter.updateMusic(artist, song, title);
+        updateMusic: (_, {id, Artist, songTitle, info, actv, idx}) => {
+            return inter.updateMusic(id, Artist, songTitle, info, actv, idx);
         },
-        removeMusic: (_, {artist, song}) => {
-            return inter.deleteMusic(artist, song);
+        removeMusic: (_, {id}) => {
+            return inter.deleteMusic(id);
         }
     }
 };

@@ -11,7 +11,9 @@ if(config.db_select == 'dynamo'){
         hometown: String,
         birth: String,
         album: String,
-        release: String    
+        release: String,
+        actv: Boolean,
+        idx: Number    
     },
     {
         useDocumentTypes: true,
@@ -31,7 +33,9 @@ if(config.db_select == 'dynamo'){
             birth: String,
             album: String,
             release: String
-        }
+        },
+        actv: Boolean,
+        idx: Number
     },
     {
         versionKey:false

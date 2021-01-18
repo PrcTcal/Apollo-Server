@@ -24,25 +24,39 @@ const typeDefs = gql`
         DESC
     }
 
+    enum Field{
+        id
+        Artist
+        songTitle,
+        actv,
+        idx
+    }
+
+    input infoInput{
+        hometown:String
+        birth:String
+        album:String
+        release:String
+    }
 
     type Music{
         id: String!
         info: Info
-        dir: Direction
-        curPage: Int
+        actv: Boolean
+        idx: Int
         Artist: String
         songTitle: String
     }
 
     type Query{
-        getMusic(id:String, artist:String, song:String):Music
-        searchMusic(id:String, stype:String, dir:Direction, page:Int, artist:String, song:String):[Music]
+        getMusic(id:String!):Music
+        searchMusic(id:String, stype:Field, dir:Direction, page:Int, Artist:String, songTitle:String):[Music]!
     }
 
     type Mutation{
-        createMusic(artist:String!, song:String!): Boolean!
-        updateMusic(artist:String!, song:String!, title:String!): Boolean!
-        removeMusic(artist:String!, song:String!): Boolean!
+        createMusic(Artist:String!, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Boolean!
+        updateMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Boolean!
+        removeMusic(id:String!): Boolean!
     }
 `;
 

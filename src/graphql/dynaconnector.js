@@ -4,68 +4,62 @@ const uuid = require('uuid');
 
 class Dynamoose{
     constructor(){
-        this.getMusic = async (id, artist, song) => {
-            let srchType;
-            if(id){
-                srchType = {'id':id};
-            } else if(artist){
-                srchType = {'Artist':artist, 'songTitle': song};
-            }
-            const music = await MusicModel.scan(srchType).exec();
-            console.log(music);
-            return music;
+        this.getMusic = async (id) => {
+            const music = await MusicModel.scan({'id':id}).exec();
+            return music[0];
         }
 
-        this.createMusic = (artist, song) => {
+        this.createMusic = (Artist, songTitle, info, actv, idx) => {
             return new Promise((resolve, reject) => {
-                let music;
-                let isDup = false;
-                MusicModel.scan({'Artist':artist, 'songTitle':song}).exec((err, result) => {
-                    for(let item of result){
-                        if(item.Artist == artist && item.songTitle == song){
-                            isDup = true;
+                MusicModel.scan({'Artist':Artist, 'songTitle':songTitle}).exec((scanerr, result) => {
+                    if(!scanerr){
+                        if(result.count == 0){
+                            MusicModel.create({'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx}, (creerr)=>{
+                                if(creerr){
+                                    return reject(creerr);
+                                } else {
+                                    return resolve(true);
+                                }
+                            });
+                        } else {
+                            return reject(new Error('Duplicated Data'));
                         }
-                    }
-                    if(!isDup){
-                        MusicModel.create({'id':uuid.v4(), 'Artist':artist, 'songTitle':song}, (err, data)=>{
-                            if(err){
-                                return reject(err);
-                            } else {
-                                return resolve(true);
-                            }
-                        });
-                        
                     } else {
-                        return reject(new Error('Duplicated Data'));
+                        return reject(scanerr);
                     }
                 });
             });
         }
 
-        this.updateMusic = async (artist, song, title) => {
+        this.updateMusic = async (id, Artist, songTitle, info, actv, idx) => {
             let entity, music;
+            let setVal = {};
+            if(Artist) setVal['Artist'] = Artist;
+            if(songTitle) setVal['songTitle'] = songTitle;
+            if(info) setVal['info'] = info;
+            if(actv != null) setVal['actv'] = actv;
+            if(idx) setVal['idx'] = idx;
             try{
-                entity = await MusicModel.scan({'Artist':artist, 'songTitle':song}).exec();
+                entity = await MusicModel.scan({'id':id}).exec();
+                console.log(setVal);
                 if(entity.count > 0){
-                    music = await MusicModel.update({'id':entity[0].id}, {"$SET": {'songTitle':title}});
+                    music = await MusicModel.update({'id':id}, {"$SET": setVal});
                     return true;
                 } else {
                     return new Error('No data found');
                 }
-                
-                //console.log('update success!');
             } catch(err) {
                 console.error(err);
                 return false;
             }
         }
 
-        this.deleteMusic = async (artist, song) => {
-            let music;
+        this.removeMusic = async (id) => {
+            let entity;
             try{
-                const entity = await MusicModel.scan({'Artist':artist, 'songTitle':song}).exec();
+                entity = await MusicModel.scan({'id':id}).exec();
                 if(entity.count > 0){
-                    music = await MusicModel.delete(entity[0].id);
+                    await MusicModel.delete(entity[0].id);
                     return true;
                 } else {
                     return new Error("No data found");
@@ -76,18 +70,15 @@ class Dynamoose{
             }
         }
 
-        this.searchMusic = async (id, stype, dir, page, artist, song) => {
+        this.searchMusic = async (id, stype, dir, page, Artist, songTitle) => {
             let music;
             if(id){
                 music = await MusicModel.scan({"id":id}).exec();
-            } else if(artist){
-                music = await MusicModel.scan({"Artist":artist}).exec();
-            } else if(song){
-                music = await MusicModel.scan({"songTitle":song}).exec();
+            } else if(Artist || songTitle){
+                music = await MusicModel.scan({"Artist":Artist, "songTitle":songTitle}).exec();
             } else {
                 music = await MusicModel.scan().exec();
             }
-
 
             if(dir){
                 music.sort((a, b) => {
@@ -108,6 +99,12 @@ class Dynamoose{
                             return a.songTitle > b.songTitle ? 1 : -1;
                         } else {
                             return a.songTitle < b.songTitle ? 1 : -1;
+                        }
+                    } else if(stype == 'idx'){
+                        if(dir == 'ASC'){
+                            return a.idx > b.idx ? 1 : -1;
+                        } else {
+                            return a.idx < b.idx ? 1 : -1;
                         }
                     }
                     
