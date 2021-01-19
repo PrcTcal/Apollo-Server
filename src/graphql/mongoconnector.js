@@ -81,32 +81,51 @@ class Mongo{
             });
         }
 
-        this.searchMusic = (id, stype, dir, page, Artist, songTitle) => {
-            let music, srchType, sortType;
-            const sort = dir == 'ASC' ? 1 : -1;
-            if(id){
-                srchType = {'id':id};
-            } else if(Artist){
-                srchType = {'Artist':Artist};
-            } else if(songTitle){
-                srchType = {'songTitle': songTitle};
-            }
-           
-            if(stype){
-                if(stype == 'id'){
-                    sortType = {"id": sort};
-                } else if(stype == 'Artist'){
-                    sortType = {"Artist": sort};
-                } else if(stype == 'songTitle'){
-                    sortType = {"songTitle": sort};
-                } else if(stype == 'idx'){
-                    sortType = {"idx": sort};
+        this.searchMusic = (id, Artist, songTitle, info, actv, idx, settings) => {
+            let music, srchType = {}, orParams = [], sortType;
+            const sort = settings.dir == 'ASC' ? 1 : -1;
+            if(settings.and || !settings.and){
+                if(id) srchType['id'] = id
+                if(Artist) srchType['Artist'] = Artist;
+                if(songTitle) srchType['songTitle'] = songTitle;
+                if(info){
+                    if(info.hometown) srchType['info.hometown'] = info.hometown;
+                    if(info.birth) srchType['info.birth'] = info.birth;
+                    if(info.album) srchType['info.album'] = info.album;
+                    if(info.release) srchType['info.release'] = info.release;
                 }
+                if(actv != null) srchType['actv'] = actv;
+                if(idx) srchType['idx'] = idx;
+            } else {
+                if(id) orParams.push({"id":id});
+                if(Artist) orParams.push({"Artist":Artist});
+                if(songTitle) orParams.push({"songTitle":songTitle});
+                if(info){
+                    if(info.hometown) orParams.push({"info.hometown":info.hometown});
+                    if(info.birth) orParams.push({"info.birth":info.birth});
+                    if(info.album) orParams.push({"info.album":info.album});
+                    if(info.release) orParams.push({"info.release":info.release});
+                }
+                if(actv != null) orParams.push({"actv":actv});
+                if(idx) orParams.push({"idx":idx});
+                srchType = {$or: orParams};
+            }
+                       
+            if(settings.stype){
+                if(settings.stype == 'id') sortType = {"id": sort};
+                else if(settings.stype == 'Artist') sortType = {"Artist": sort};
+                else if(settings.stype == 'songTitle') sortType = {"songTitle": sort};
+                else if(settings.stype == 'hometown') sortType = {"info.hometown": sort};
+                else if(settings.stype == 'birth') sortType = {"info.birth": sort};
+                else if(settings.stype == 'album') sortType = {"info.album": sort};
+                else if(settings.stype == 'release') sortType = {"info.release": sort};
+                else if(settings.stype == 'actv') sortType = {"actv": sort};
+                else if(settings.stype == 'idx') sortType = {"idx": sort};
             }
             
             music = MusicModel.find(srchType)
-            if(page){
-                music.limit(5).skip((page-1) * 5).sort(sortType);
+            if(settings.page){
+                music.limit(5).skip((settings.page-1) * 5).sort(sortType);
             } else {
                 music.sort(sortType);
             }

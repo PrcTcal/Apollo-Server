@@ -63,20 +63,35 @@ function removeMusic(id){
     }
 }
 
-function searchMusic(id, stype, dir, page, Artist, songTitle){
+function searchMusic(id, Artist, songTitle, info, actv, idx, settings){
     if(config.db_select == 'mongo'){
         const music = new mongoConn.Mongo();
-        return music.searchMusic(id, stype, dir, page, Artist, songTitle);
+        return music.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
     } else if(config.db_select == 'dynamo'){
         if(config.db_mapper == 'dynamoose'){
             const music = new dynaConn.Dynamoose();
-            return music.searchMusic(id, stype, dir, page, Artist, songTitle);
+            return music.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
         } else if(config.db_mapper == 'aws_sdk'){
             const music = new sdkConn.SDK();
-            return music.searchMusic(id, stype, dir, page, Artist, songTitle);
+            return music.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
+        }
+    }
+}
+
+function queryMusic(id, Artist, songTitle, info, actv, idx, settings){
+    if(config.db_select == 'mongo'){
+        const music = new mongoConn.Mongo();
+        return music.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
+    } else if(config.db_select == 'dynamo'){
+        if(config.db_mapper == 'dynamoose'){
+            const music = new dynaConn.Dynamoose();
+            return music.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
+        } else if(config.db_mapper == 'aws_sdk'){
+            const music = new sdkConn.SDK();
+            return music.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
         }
     }
 }
 
 
-module.exports = {createMusic, getMusic, updateMusic, removeMusic, searchMusic};
+module.exports = {createMusic, getMusic, updateMusic, removeMusic, searchMusic, queryMusic};

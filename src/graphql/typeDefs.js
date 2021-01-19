@@ -27,8 +27,12 @@ const typeDefs = gql`
     enum Field{
         id
         Artist
-        songTitle,
-        actv,
+        songTitle
+        hometown
+        birth
+        album
+        release
+        actv
         idx
     }
 
@@ -37,6 +41,13 @@ const typeDefs = gql`
         birth:String
         album:String
         release:String
+    }
+
+    input Setting{
+        stype: Field
+        dir: Direction,
+        page: Int,
+        and: Boolean
     }
 
     type Music{
@@ -50,7 +61,8 @@ const typeDefs = gql`
 
     type Query{
         getMusic(id:String!):Music
-        searchMusic(id:String, stype:Field, dir:Direction, page:Int, Artist:String, songTitle:String):[Music]!
+        searchMusic(id:String, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx:Int, settings:Setting):[Music]!
+        queryMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx:Int, settings:Setting):[Music]!
     }
 
     type Mutation{
