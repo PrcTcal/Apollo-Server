@@ -31,7 +31,7 @@ const resolvers = {
             return inter.updateMusic(id, Artist, songTitle, info, actv, idx);
         },
         removeMusic: (_, {id}) => {
-            return inter.deleteMusic(id);
+            return inter.removeMusic(id);
         }
     }
 };

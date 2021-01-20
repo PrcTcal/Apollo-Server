@@ -62,7 +62,7 @@ const typeDefs = gql`
     type Query{
         getMusic(id:String!):Music
         searchMusic(id:String, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx:Int, settings:Setting):[Music]!
-        queryMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx:Int, settings:Setting):[Music]!
+        queryMusic(id:String, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx:Int, settings:Setting):[Music]!
     }
 
     type Mutation{

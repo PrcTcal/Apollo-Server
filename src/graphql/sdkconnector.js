@@ -52,6 +52,8 @@ class SDK{
                             params = {
                                 TableName: config.aws_table_name,
                                 Item: {
+                                    dummy: 0,
+                                    d2: result.ScannedCount.toString(),
                                     id: uuid.v4(),
                                     Artist: Artist,
                                     songTitle: songTitle,
@@ -101,11 +103,15 @@ class SDK{
                             if(info) {updFields[':info'] = info; updExpression += updExpression != '' ? ', info = :info ' : 'info = :info ';}
                             if(actv != null) {updFields[':actv'] = actv; updExpression += updExpression != '' ? ', actv = :actv ' : 'actv = :actv ';}
                             if(idx) {updFields[':idx'] = idx; updExpression += updExpression != '' ? ', idx = :idx ' : 'idx = :idx ';}
-
                             params = {
                                 TableName: config.aws_table_name,
                                 Key: {
-                                    "id": result['Items'][0].id
+                                    // test01-music 테이블용
+                                    //"id": result['Items'][0].id
+
+                                    // test01-music2 테이블용
+                                    "dummy": 0,
+                                    "d2": result['Items'][0].d2
                                 },
                                 UpdateExpression: "set " + updExpression
                             };
@@ -150,7 +156,12 @@ class SDK{
                             params = {
                                 TableName: config.aws_table_name,
                                 Key: {
-                                    "id": result['Items'][0].id
+                                    // test01-music 테이블용
+                                    //"id": result['Items'][0].id
+
+                                    // test01-music2 테이블용
+                                    "dummy": 0,
+                                    "d2": result['Items'][0].d2
                                 }
                             };
                             docClient.delete(params, (delerr) => {
@@ -208,7 +219,7 @@ class SDK{
                         if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
                         filterExp += '#info.#birth = :birth';
                         attName['#info'] = 'info'; 
-                        attName['#birth'] = 'info.birth';
+                        attName['#birth'] = 'birth';
                         attVal[':birth'] = info.birth;
                     }
                     if(info.album){
@@ -222,7 +233,7 @@ class SDK{
                         if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
                         filterExp += '#info.#release = :release';
                         attName['#info'] = 'info'; 
-                        attName['#release'] = 'info.release';
+                        attName['#release'] = 'release';
                         attVal[':release'] = info.release;
                     }
                 }
@@ -242,104 +253,54 @@ class SDK{
                 if(filterExp){
                     params.FilterExpression = filterExp;
                     params.ExpressionAttributeNames = attName;
-                    params.ExpressionAttributeValues = attVal;
-                    
+                    params.ExpressionAttributeValues = attVal;   
                 }
                 
                 docClient.scan(params, function(err, data) {
                     if (err) {
                         return reject(err);
                     } else {
+                        console.log(data);
                         if(settings.dir){
                             data['Items'].sort((a, b) => {
                                 if(settings.stype == 'id'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.id > b.id ? 1 : -1;
-                                    } else {
-                                        return a.id < b.id ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.id > b.id ? 1 : -1) : (a.id < b.id ? 1 : -1);
                                 } else if(settings.stype == 'Artist'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.Artist > b.Artist ? 1 : -1;
-                                    } else {
-                                        return a.Artist < b.Artist ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.Artist > b.Artist ? 1 : -1) : (a.Artist < b.Artist ? 1 : -1);
                                 } else if(settings.stype == 'songTitle'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.songTitle > b.songTitle ? 1 : -1;
-                                    } else {
-                                        return a.songTitle < b.songTitle ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.songTitle > b.songTitle ? 1 : -1) : (a.songTitle < b.songTitle ? 1 : -1);
                                 } else if(settings.stype == 'hometown'){
                                     if(a.info.hometown && b.info.hometown){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.hometown > b.info.hometown ? 1 : -1;
-                                        } else {
-                                            return a.info.hometown < b.info.hometown ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.hometown > b.info.hometown ? 1 : -1) : (a.info.hometown < b.info.hometown ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.hometown) return -1;
-                                            if(!b.info.hometown) return 1;
-                                        } else {
-                                            if(!a.info.hometown) return 1;
-                                            if(!b.info.hometown) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.hometown ? -1 : 1) : (!a.info.hometown ? 1 : -1);
                                     }
                                 } else if(settings.stype == 'birth'){
                                     if(a.info.birth && b.info.birth){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.birth > b.info.birth ? 1 : -1;
-                                        } else {
-                                            return a.info.birth < b.info.birth ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.birth > b.info.birth ? 1 : -1) : (a.info.birth < b.info.birth ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.birth) return -1;
-                                            if(!b.info.birth) return 1;
-                                        } else {
-                                            if(!a.info.birth) return 1;
-                                            if(!b.info.birth) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.birth ? -1 : 1) : (!a.info.birth ? 1 : -1);
                                     }
                                 } else if(settings.stype == 'album'){
                                     if(a.info.album && b.info.album){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.album > b.info.album ? 1 : -1;
-                                        } else {
-                                            return a.info.album < b.info.album ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.album > b.info.album ? 1 : -1) : (a.info.album < b.info.album ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.album) return -1;
-                                            if(!b.info.album) return 1;
-                                        } else {
-                                            if(!a.info.album) return 1;
-                                            if(!b.info.album) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.album ? -1 : 1) : (!a.info.album ? 1 : -1);
                                     }
                                 } else if(settings.stype == 'release'){
                                     if(a.info.release && b.info.release){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.release > b.info.release ? 1 : -1;
-                                        } else {
-                                            return a.info.release < b.info.release ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.release > b.info.release ? 1 : -1) : (a.info.release < b.info.release ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.release) return -1;
-                                            if(!b.info.release) return 1;
-                                        } else {
-                                            if(!a.info.release) return 1;
-                                            if(!b.info.release) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.release ? -1 : 1) : (!a.info.release ? 1 : -1);
+                                    }
+                                } else if(settings.stype == 'actv'){
+                                    if(settings.dir == 'ASC'){
+                                        if(a.actv != b.actv) return a.actv ? 1 : -1;
+                                    } else {
+                                        if(a.actv != b.actv) return a.actv ? 1 : -1;
                                     }
                                 } else if(settings.stype == 'idx'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.idx > b.idx ? 1 : -1;
-                                    } else {
-                                        return a.idx < b.idx ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.idx > b.idx ? 1 : -1) : (a.idx < b.idx ? 1 : -1);
                                 } 
                             });
                         }
@@ -364,21 +325,24 @@ class SDK{
                 let docClient = new AWS.DynamoDB.DocumentClient();
                 let params = {
                     TableName: config.aws_table_name,
-                    KeyConditionExpression: "#id = :id"
+                    KeyConditionExpression: "dummy = :dummy"
                 };
                 let filterExp = '', attName = {}, attVal = {};
+                attVal[':dummy'] = 0;
                 
-                attName['#id'] = 'id';
-                attVal[':id'] = id;
-                
+                if(id){
+                    filterExp += '#id = :id';
+                    attName['#id'] = 'id';
+                    attVal[':id'] = id;
+                }
                 if(Artist){
-                    if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                    if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                     filterExp += '#Artist = :Artist';
                     attName['#Artist'] = 'Artist';
                     attVal[':Artist'] = Artist;
                 }
                 if(songTitle){
-                    if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                    if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                     filterExp += '#songTitle = :songTitle';                    
                     attName['#songTitle'] = 'songTitle';
                     attVal[':songTitle'] = songTitle;
@@ -386,56 +350,51 @@ class SDK{
                 
                 if(info){
                     if(info.hometown){
-                        if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                        if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                         filterExp += '#info.#hometown = :hometown';
                         attName['#info'] = 'info';           
                         attName['#hometown'] = 'hometown';
                         attVal[':hometown'] = info.hometown;                    
                     }
                     if(info.birth){
-                        if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                        if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                         filterExp += '#info.#birth = :birth';
                         attName['#info'] = 'info'; 
-                        attName['#birth'] = 'info.birth';
+                        attName['#birth'] = 'birth';
                         attVal[':birth'] = info.birth;
                     }
                     if(info.album){
-                        if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                        if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                         filterExp += '#info.#album = :album';
                         attName['#info'] = 'info'; 
                         attName['#album'] = 'album';
                         attVal[':album'] = info.album;
                     }
                     if(info.release){
-                        if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                        if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                         filterExp += '#info.#release = :release';
                         attName['#info'] = 'info'; 
-                        attName['#release'] = 'info.release';
+                        attName['#release'] = 'release';
                         attVal[':release'] = info.release;
                     }
                 }
-                
                 if(actv != null){
-                    if(filterExp != '') filterExp += settings.and ? ' and ' : ' or ';
+                    if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                     filterExp += '#actv = :actv';
                     attName['#actv'] = 'actv';
                     attVal[':actv'] = actv;
                 }
                 if(idx){
-                    params.KeyConditionExpression += settings.and ? ' and #idx = :idx' : ' and #idx between :v1 and :v2';
+                    if(filterExp != '') filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
+                    filterExp += '#idx = :idx';
                     attName['#idx'] = 'idx';
-                    
-                    if(!settings.and){
-                        attVal[':v1'] = 1;
-                        attVal[':v2'] = 13;
-                    } else {
-                        attVal[':idx'] = idx;
-                    }
+                    attVal[':idx'] = idx;
                 }
-                if(filterExp) params.FilterExpression = filterExp;
-                params.ExpressionAttributeNames = attName;
+                if(filterExp) {
+                    params.FilterExpression = filterExp;
+                    params.ExpressionAttributeNames = attName;
+                }
                 params.ExpressionAttributeValues = attVal;
-                console.log(params);
                 
                 docClient.query(params, function(err, data) {
                     if (err) {
@@ -444,94 +403,44 @@ class SDK{
                         if(settings.dir){
                             data['Items'].sort((a, b) => {
                                 if(settings.stype == 'id'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.id > b.id ? 1 : -1;
-                                    } else {
-                                        return a.id < b.id ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.id > b.id ? 1 : -1) : (a.id < b.id ? 1 : -1);
                                 } else if(settings.stype == 'Artist'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.Artist > b.Artist ? 1 : -1;
-                                    } else {
-                                        return a.Artist < b.Artist ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.Artist > b.Artist ? 1 : -1) : (a.Artist < b.Artist ? 1 : -1);
                                 } else if(settings.stype == 'songTitle'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.songTitle > b.songTitle ? 1 : -1;
-                                    } else {
-                                        return a.songTitle < b.songTitle ? 1 : -1;
-                                    }
+                                    return settings.dir == 'ASC' ? (a.songTitle > b.songTitle ? 1 : -1) : (a.songTitle < b.songTitle ? 1 : -1);
                                 } else if(settings.stype == 'hometown'){
                                     if(a.info.hometown && b.info.hometown){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.hometown > b.info.hometown ? 1 : -1;
-                                        } else {
-                                            return a.info.hometown < b.info.hometown ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.hometown > b.info.hometown ? 1 : -1) : (a.info.hometown < b.info.hometown ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.hometown) return -1;
-                                            if(!b.info.hometown) return 1;
-                                        } else {
-                                            if(!a.info.hometown) return 1;
-                                            if(!b.info.hometown) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.hometown ? -1 : 1) : (!a.info.hometown ? 1 : -1);
                                     }
                                 } else if(settings.stype == 'birth'){
                                     if(a.info.birth && b.info.birth){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.birth > b.info.birth ? 1 : -1;
-                                        } else {
-                                            return a.info.birth < b.info.birth ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.birth > b.info.birth ? 1 : -1) : (a.info.birth < b.info.birth ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.birth) return -1;
-                                            if(!b.info.birth) return 1;
-                                        } else {
-                                            if(!a.info.birth) return 1;
-                                            if(!b.info.birth) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.birth ? -1 : 1) : (!a.info.birth ? 1 : -1);
                                     }
                                 } else if(settings.stype == 'album'){
                                     if(a.info.album && b.info.album){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.album > b.info.album ? 1 : -1;
-                                        } else {
-                                            return a.info.album < b.info.album ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.album > b.info.album ? 1 : -1) : (a.info.album < b.info.album ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.album) return -1;
-                                            if(!b.info.album) return 1;
-                                        } else {
-                                            if(!a.info.album) return 1;
-                                            if(!b.info.album) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.album ? -1 : 1) : (!a.info.album ? 1 : -1);
                                     }
                                 } else if(settings.stype == 'release'){
                                     if(a.info.release && b.info.release){
-                                        if(settings.dir == 'ASC'){
-                                            return a.info.release > b.info.release ? 1 : -1;
-                                        } else {
-                                            return a.info.release < b.info.release ? 1 : -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (a.info.release > b.info.release ? 1 : -1) : (a.info.release < b.info.release ? 1 : -1);
                                     } else {
-                                        if(settings.dir == 'ASC'){
-                                            if(!a.info.release) return -1;
-                                            if(!b.info.release) return 1;
-                                        } else {
-                                            if(!a.info.release) return 1;
-                                            if(!b.info.release) return -1;
-                                        }
+                                        return settings.dir == 'ASC' ? (!a.info.release ? -1 : 1) : (!a.info.release ? 1 : -1);
+                                    }
+                                } else if(settings.stype == 'actv'){
+                                    if(settings.dir == 'ASC'){
+                                        if(a.actv != b.actv) return a.actv ? 1 : -1;
+                                    } else {
+                                        if(a.actv != b.actv) return a.actv ? 1 : -1;
                                     }
                                 } else if(settings.stype == 'idx'){
-                                    if(settings.dir == 'ASC'){
-                                        return a.idx > b.idx ? 1 : -1;
-                                    } else {
-                                        return a.idx < b.idx ? 1 : -1;
-                                    }
-                                } 
+                                    return settings.dir == 'ASC' ? (a.idx > b.idx ? 1 : -1) : (a.idx < b.idx ? 1 : -1);
+                                }
                             });
                         }
                         if(settings.page){

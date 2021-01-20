@@ -84,7 +84,7 @@ class Mongo{
         this.searchMusic = (id, Artist, songTitle, info, actv, idx, settings) => {
             let music, srchType = {}, orParams = [], sortType;
             const sort = settings.dir == 'ASC' ? 1 : -1;
-            if(settings.and || !settings.and){
+            if(settings.and || settings.and == null){
                 if(id) srchType['id'] = id
                 if(Artist) srchType['Artist'] = Artist;
                 if(songTitle) srchType['songTitle'] = songTitle;
@@ -108,7 +108,7 @@ class Mongo{
                 }
                 if(actv != null) orParams.push({"actv":actv});
                 if(idx) orParams.push({"idx":idx});
-                srchType = {$or: orParams};
+                if(orParams.length > 0) srchType = {$or: orParams};
             }
                        
             if(settings.stype){

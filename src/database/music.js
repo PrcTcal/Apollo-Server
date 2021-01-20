@@ -5,6 +5,14 @@ if(config.db_select == 'dynamo'){
     const Dynamoose = require('dynamoose');
 
     const schema = new Dynamoose.Schema({
+        dummy: {
+            type: Number,
+            hashKey: true
+        },
+        d2: {
+            type: String,
+            rangeKey:true
+        },
         id: String,
         Artist: String,
         songTitle: String,

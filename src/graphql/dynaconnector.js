@@ -14,7 +14,7 @@ class Dynamoose{
                 MusicModel.scan({'Artist':Artist, 'songTitle':songTitle}).exec((scanerr, result) => {
                     if(!scanerr){
                         if(result.count == 0){
-                            MusicModel.create({'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx}, (creerr)=>{
+                            MusicModel.create({'dummy':0, 'd2':result.scannedCount.toString(), 'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx}, (creerr)=>{
                                 if(creerr){
                                     return reject(creerr);
                                 } else {
@@ -41,9 +41,12 @@ class Dynamoose{
             if(idx) setVal['idx'] = idx;
             try{
                 entity = await MusicModel.scan({'id':id}).exec();
-                console.log(setVal);
                 if(entity.count > 0){
-                    music = await MusicModel.update({'id':id}, {"$SET": setVal});
+                    // test01-music 테이블용
+                    //music = await MusicModel.update({'id':id}, {"$SET": setVal});
+
+                    // test01-music2 테이블용
+                    music = await MusicModel.update({'dummy':0, 'd2':entity[0].d2}, {"$SET": setVal});
                     return true;
                 } else {
                     return new Error('No data found');
@@ -58,8 +61,13 @@ class Dynamoose{
             let entity;
             try{
                 entity = await MusicModel.scan({'id':id}).exec();
+                console.log(entity);
                 if(entity.count > 0){
-                    await MusicModel.delete(entity[0].id);
+                    // test01-music 테이블용
+                    //await MusicModel.delete(entity[0].id);
+
+                    // test01-music2 테이블용
+                    await MusicModel.delete({'dummy':0, 'd2':entity[0].d2});
                     return true;
                 } else {
                     return new Error("No data found");
@@ -72,7 +80,7 @@ class Dynamoose{
 
         this.searchMusic = async (id, Artist, songTitle, info, actv, idx, settings) => {
             let music, srchType = {};
-            if(settings.and || !settings.and){
+            if(settings.and || settings.and == null){
                 if(id) srchType['id'] = id;
                 if(Artist) srchType['Artist'] = Artist;
                 if(songTitle) srchType['songTitle'] = songTitle;
@@ -88,40 +96,16 @@ class Dynamoose{
 
             } else {
                 if(id) music = MusicModel.scan('id').eq(id);
-                if(Artist){
-                    if(music) music.or().where('Artist').eq(Artist);
-                    else music = MusicModel.scan('Artist').eq(Artist);
-                }
-                if(songTitle){
-                    if(music) music.or().where('songTitle').eq(songTitle);
-                    else music = MusicModel.scan('songTitle').eq(songTitle);
-                }
+                if(Artist) music = music != null ? music.or().where('Artist').eq(Artist) : MusicModel.scan('Artist').eq(Artist);
+                if(songTitle) music = music != null ? music.or().where('songTitle').eq(songTitle) : MusicModel.scan('songTitle').eq(songTitle);
                 if(info){
-                    if(info.hometown){
-                        if(music) music.or().where('info.hometown').eq(info.hometown);
-                        else music = MusicModel.scan('info.hometown').eq(info.hometown);
-                    }
-                    if(info.birth){
-                        if(music) music.or().where('info.birth').eq(info.birth);
-                        else music = MusicModel.scan('info.birth').eq(info.birth);
-                    }
-                    if(info.album){
-                        if(music) music.or().where('info.album').eq(info.album);
-                        else music = MusicModel.scan('Artist').eq(info.album);
-                    }
-                    if(info.release) {
-                        if(music) music.or().where('info.release').eq(info.release);
-                        else music = MusicModel.scan('info.release').eq(info.release);
-                    }
+                    if(info.hometown) music = music != null ? music.or().where('info.hometown').eq(info.hometown) : MusicModel.scan('info.hometown').eq(info.hometown);
+                    if(info.birth) music = music != null ? music.or().where('info.birth').eq(info.birth) : MusicModel.scan('info.birth').eq(info.birth);
+                    if(info.album) music = music != null ? music.or().where('info.album').eq(info.album) : MusicModel.scan('info.album').eq(info.album);
+                    if(info.release) music = music != null ? music.or().where('info.release').eq(info.release) : MusicModel.scan('info.release').eq(info.release);
                 }
-                if(actv != null) {
-                    if(music) music.or().where('actv').eq(actv);
-                    else music = MusicModel.scan('actv').eq(actv);
-                }
-                if(idx) {
-                    if(music) music.or().where('idx').eq(idx);
-                    else music = MusicModel.scan('idx').eq(idx);
-                }
+                if(actv != null) music = music != null ? music.or().where('actv').eq(actv) : MusicModel.scan('actv').eq(actv);
+                if(idx) music = music != null ? music.or().where('idx').eq(idx) : MusicModel.scan('idx').eq(idx);
                 if(!music) music = MusicModel.scan();
                 music = await music.exec();
             }
@@ -129,93 +113,43 @@ class Dynamoose{
             if(settings.dir){
                 music.sort((a, b) => {
                     if(settings.stype == 'id'){
-                        if(settings.dir == 'ASC'){
-                            return a.id > b.id ? 1 : -1;
-                        } else {
-                            return a.id < b.id ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.id > b.id ? 1 : -1) : (a.id < b.id ? 1 : -1);
                     } else if(settings.stype == 'Artist'){
-                        if(settings.dir == 'ASC'){
-                            return a.Artist > b.Artist ? 1 : -1;
-                        } else {
-                            return a.Artist < b.Artist ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.Artist > b.Artist ? 1 : -1) : (a.Artist < b.Artist ? 1 : -1);
                     } else if(settings.stype == 'songTitle'){
-                        if(settings.dir == 'ASC'){
-                            return a.songTitle > b.songTitle ? 1 : -1;
-                        } else {
-                            return a.songTitle < b.songTitle ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.songTitle > b.songTitle ? 1 : -1) : (a.songTitle < b.songTitle ? 1 : -1);
                     } else if(settings.stype == 'hometown'){
                         if(a.info.hometown && b.info.hometown){
-                            if(settings.dir == 'ASC'){
-                                return a.info.hometown > b.info.hometown ? 1 : -1;
-                            } else {
-                                return a.info.hometown < b.info.hometown ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.hometown > b.info.hometown ? 1 : -1) : (a.info.hometown < b.info.hometown ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.hometown) return -1;
-                                if(!b.info.hometown) return 1;
-                            } else {
-                                if(!a.info.hometown) return 1;
-                                if(!b.info.hometown) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.hometown ? -1 : 1) : (!a.info.hometown ? 1 : -1);
                         }
                     } else if(settings.stype == 'birth'){
                         if(a.info.birth && b.info.birth){
-                            if(settings.dir == 'ASC'){
-                                return a.info.birth > b.info.birth ? 1 : -1;
-                            } else {
-                                return a.info.birth < b.info.birth ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.birth > b.info.birth ? 1 : -1) : (a.info.birth < b.info.birth ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.birth) return -1;
-                                if(!b.info.birth) return 1;
-                            } else {
-                                if(!a.info.birth) return 1;
-                                if(!b.info.birth) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.birth ? -1 : 1) : (!a.info.birth ? 1 : -1);
                         }
                     } else if(settings.stype == 'album'){
                         if(a.info.album && b.info.album){
-                            if(settings.dir == 'ASC'){
-                                return a.info.album > b.info.album ? 1 : -1;
-                            } else {
-                                return a.info.album < b.info.album ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.album > b.info.album ? 1 : -1) : (a.info.album < b.info.album ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.album) return -1;
-                                if(!b.info.album) return 1;
-                            } else {
-                                if(!a.info.album) return 1;
-                                if(!b.info.album) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.album ? -1 : 1) : (!a.info.album ? 1 : -1);
                         }
                     } else if(settings.stype == 'release'){
                         if(a.info.release && b.info.release){
-                            if(settings.dir == 'ASC'){
-                                return a.info.release > b.info.release ? 1 : -1;
-                            } else {
-                                return a.info.release < b.info.release ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.release > b.info.release ? 1 : -1) : (a.info.release < b.info.release ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.release) return -1;
-                                if(!b.info.release) return 1;
-                            } else {
-                                if(!a.info.release) return 1;
-                                if(!b.info.release) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.release ? -1 : 1) : (!a.info.release ? 1 : -1);
+                        }
+                    } else if(settings.stype == 'actv'){
+                        if(settings.dir == 'ASC'){
+                            if(a.actv != b.actv) return a.actv ? 1 : -1;
+                        } else {
+                            if(a.actv != b.actv) return a.actv ? 1 : -1;
                         }
                     } else if(settings.stype == 'idx'){
-                        if(settings.dir == 'ASC'){
-                            return a.idx > b.idx ? 1 : -1;
-                        } else {
-                            return a.idx < b.idx ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.idx > b.idx ? 1 : -1) : (a.idx < b.idx ? 1 : -1);
                     } 
                     
                 });
@@ -232,14 +166,10 @@ class Dynamoose{
         }
 
         this.queryMusic = async (id, Artist, songTitle, info, actv, idx, settings) => {
-            let music;
+            let music = await MusicModel.query("dummy").eq(0);            
             if(settings.and || settings.and == null){
-                music = await MusicModel.query('id').eq(id).exec();
-                //console.log(music);
-                music = await music.filter('Artist').eq(Artist).exec();
-                console.log(music);
-                //if(Artist) music = music.and().where('Artist').eq(Artist);
-                /*
+                if(id) music.and().where('id').eq(id);
+                if(Artist) music.and().where('Artist').eq(Artist);
                 if(songTitle) music.and().where('songTitle').eq(songTitle);
                 if(info){
                     if(info.hometown) music.and().where('info.hometown').eq(info.hometown);
@@ -249,121 +179,64 @@ class Dynamoose{
                 }
                 if(actv != null) music.and().where('actv').eq(actv);
                 if(idx) music.and().where('idx').eq(idx);
-                */
-                
-                //music = await music.exec();
-                //console.log(music);
             } else {
-                music = MusicModel.query('id').eq(id);
-                console.log('1');
-                if(Artist) music.or().where('Artist').eq(Artist);
-                console.log('2');
-                if(songTitle) music.or().where('songTitle').eq(songTitle);
+                let orExp = new dynamoose.Condition();
+                if(id) orExp.or().where('id').eq(id);
+                if(Artist) orExp.or().where('Artist').eq(Artist);
+                if(songTitle) orExp.or().where('songTitle').eq(songTitle);
                 if(info){
-                    if(info.hometown) music.or().where('info.hometown').eq(info.hometown);
-                    if(info.birth) music.or().where('info.birth').eq(info.birth);
-                    if(info.album) music.or().where('info.album').eq(info.album);
-                    if(info.release) music.or().where('info.release').eq(info.release);
+                    if(info.hometown) orExp.or().where('info.hometown').eq(info.hometown);
+                    if(info.birth) orExp.or().where('info.birth').eq(info.birth);
+                    if(info.album) orExp.or().where('info.album').eq(info.album);
+                    if(info.release) orExp.or().where('info.release').eq(info.release);
                 }
-                if(actv != null) music.or().where('actv').eq(actv);
-                if(idx) music.or().where('idx').eq(idx);
-                console.log('3');
-                music = await music.exec();
-                console.log('4');
+                if(actv != null) orExp.or().where('actv').eq(actv);
+                if(idx) orExp.or().where('idx').eq(idx);
+                if(orExp.settings.conditions.length > 0) music.and().parenthesis(orExp);
             }
-            /*
+            music = await music.exec();
+            
             if(settings.dir){
                 music.sort((a, b) => {
                     if(settings.stype == 'id'){
-                        if(settings.dir == 'ASC'){
-                            return a.id > b.id ? 1 : -1;
-                        } else {
-                            return a.id < b.id ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.id > b.id ? 1 : -1) : (a.id < b.id ? 1 : -1);
                     } else if(settings.stype == 'Artist'){
-                        if(settings.dir == 'ASC'){
-                            return a.Artist > b.Artist ? 1 : -1;
-                        } else {
-                            return a.Artist < b.Artist ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.Artist > b.Artist ? 1 : -1) : (a.Artist < b.Artist ? 1 : -1);
                     } else if(settings.stype == 'songTitle'){
-                        if(settings.dir == 'ASC'){
-                            return a.songTitle > b.songTitle ? 1 : -1;
-                        } else {
-                            return a.songTitle < b.songTitle ? 1 : -1;
-                        }
+                        return settings.dir == 'ASC' ? (a.songTitle > b.songTitle ? 1 : -1) : (a.songTitle < b.songTitle ? 1 : -1);
                     } else if(settings.stype == 'hometown'){
                         if(a.info.hometown && b.info.hometown){
-                            if(settings.dir == 'ASC'){
-                                return a.info.hometown > b.info.hometown ? 1 : -1;
-                            } else {
-                                return a.info.hometown < b.info.hometown ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.hometown > b.info.hometown ? 1 : -1) : (a.info.hometown < b.info.hometown ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.hometown) return -1;
-                                if(!b.info.hometown) return 1;
-                            } else {
-                                if(!a.info.hometown) return 1;
-                                if(!b.info.hometown) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.hometown ? -1 : 1) : (!a.info.hometown ? 1 : -1);
                         }
                     } else if(settings.stype == 'birth'){
                         if(a.info.birth && b.info.birth){
-                            if(settings.dir == 'ASC'){
-                                return a.info.birth > b.info.birth ? 1 : -1;
-                            } else {
-                                return a.info.birth < b.info.birth ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.birth > b.info.birth ? 1 : -1) : (a.info.birth < b.info.birth ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.birth) return -1;
-                                if(!b.info.birth) return 1;
-                            } else {
-                                if(!a.info.birth) return 1;
-                                if(!b.info.birth) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.birth ? -1 : 1) : (!a.info.birth ? 1 : -1);
                         }
                     } else if(settings.stype == 'album'){
                         if(a.info.album && b.info.album){
-                            if(settings.dir == 'ASC'){
-                                return a.info.album > b.info.album ? 1 : -1;
-                            } else {
-                                return a.info.album < b.info.album ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.album > b.info.album ? 1 : -1) : (a.info.album < b.info.album ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.album) return -1;
-                                if(!b.info.album) return 1;
-                            } else {
-                                if(!a.info.album) return 1;
-                                if(!b.info.album) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.album ? -1 : 1) : (!a.info.album ? 1 : -1);
                         }
                     } else if(settings.stype == 'release'){
                         if(a.info.release && b.info.release){
-                            if(settings.dir == 'ASC'){
-                                return a.info.release > b.info.release ? 1 : -1;
-                            } else {
-                                return a.info.release < b.info.release ? 1 : -1;
-                            }
+                            return settings.dir == 'ASC' ? (a.info.release > b.info.release ? 1 : -1) : (a.info.release < b.info.release ? 1 : -1);
                         } else {
-                            if(settings.dir == 'ASC'){
-                                if(!a.info.release) return -1;
-                                if(!b.info.release) return 1;
-                            } else {
-                                if(!a.info.release) return 1;
-                                if(!b.info.release) return -1;
-                            }
+                            return settings.dir == 'ASC' ? (!a.info.release ? -1 : 1) : (!a.info.release ? 1 : -1);
+                        }
+                    } else if(settings.stype == 'actv'){
+                        if(settings.dir == 'ASC'){
+                            if(a.actv != b.actv) return a.actv ? 1 : -1;
+                        } else {
+                            if(a.actv != b.actv) return a.actv ? 1 : -1;
                         }
                     } else if(settings.stype == 'idx'){
-                        if(settings.dir == 'ASC'){
-                            return a.idx > b.idx ? 1 : -1;
-                        } else {
-                            return a.idx < b.idx ? 1 : -1;
-                        }
-                    } 
-                    
+                        return settings.dir == 'ASC' ? (a.idx > b.idx ? 1 : -1) : (a.idx < b.idx ? 1 : -1);
+                    }
                 });
             }
             if(settings.page){
@@ -373,7 +246,7 @@ class Dynamoose{
                     temp.push(music[i]);
                 }
                 music = temp;
-            }*/
+            }
             return music;
         }
     }
