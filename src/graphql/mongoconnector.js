@@ -81,11 +81,10 @@ class Mongo{
             });
         }
 
-        this.searchMusic = (id, Artist, songTitle, info, actv, idx, settings) => {
-            let music, srchType = {}, orParams = [], sortType;
-            const sort = settings.dir == 'ASC' ? 1 : -1;
+        this.searchMusic = (Artist, songTitle, info, actv, idx, settings) => {
+            let music, srchType = {}, orParams = [], sortType = {};
+
             if(settings.and || settings.and == null){
-                if(id) srchType['id'] = id
                 if(Artist) srchType['Artist'] = Artist;
                 if(songTitle) srchType['songTitle'] = songTitle;
                 if(info){
@@ -97,7 +96,6 @@ class Mongo{
                 if(actv != null) srchType['actv'] = actv;
                 if(idx) srchType['idx'] = idx;
             } else {
-                if(id) orParams.push({"id":id});
                 if(Artist) orParams.push({"Artist":Artist});
                 if(songTitle) orParams.push({"songTitle":songTitle});
                 if(info){
@@ -110,25 +108,19 @@ class Mongo{
                 if(idx) orParams.push({"idx":idx});
                 if(orParams.length > 0) srchType = {$or: orParams};
             }
-                       
-            if(settings.stype){
-                if(settings.stype == 'id') sortType = {"id": sort};
-                else if(settings.stype == 'Artist') sortType = {"Artist": sort};
-                else if(settings.stype == 'songTitle') sortType = {"songTitle": sort};
-                else if(settings.stype == 'hometown') sortType = {"info.hometown": sort};
-                else if(settings.stype == 'birth') sortType = {"info.birth": sort};
-                else if(settings.stype == 'album') sortType = {"info.album": sort};
-                else if(settings.stype == 'release') sortType = {"info.release": sort};
-                else if(settings.stype == 'actv') sortType = {"actv": sort};
-                else if(settings.stype == 'idx') sortType = {"idx": sort};
+        
+            if(settings != null){
+                if(settings.stype != null){
+                    if(['hometown','birth','album','release'].find(ele => ele == settings.stype) != null){
+                        sortType['info.' + settings.stype] = settings.dir == 'ASC' ? 1 : -1;
+                    } else {
+                        sortType[settings.stype] = settings.dir == 'ASC' ? 1 : -1;
+                    }
+                }
             }
-            
             music = MusicModel.find(srchType)
-            if(settings.page){
-                music.limit(5).skip((settings.page-1) * 5).sort(sortType);
-            } else {
-                music.sort(sortType);
-            }
+            settings.page != null ? music.limit(5).skip((settings.page-1) * 5).sort(sortType) : music.sort(sortType);
+            
             return music;
         }
 

@@ -16,11 +16,11 @@ const resolvers = {
         getMusic: (_, {id}) => {
             return inter.getMusic(id);
         },
-        searchMusic: (_, {id, Artist, songTitle, info, actv, idx, settings}) => {
-            return inter.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
+        searchMusic: (_, {Artist, songTitle, info, actv, idx, settings}) => {
+            return inter.searchMusic(Artist, songTitle, info, actv, idx, settings);
         },
-        queryMusic: (_, {id, Artist, songTitle, info, actv, idx, settings}) => {
-            return inter.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
+        queryMusic: (_, {Artist, songTitle, info, actv, idx, settings}) => {
+            return inter.queryMusic(Artist, songTitle, info, actv, idx, settings);
         }
     },
     Mutation: {

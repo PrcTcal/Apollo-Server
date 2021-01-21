@@ -63,32 +63,32 @@ function removeMusic(id){
     }
 }
 
-function searchMusic(id, Artist, songTitle, info, actv, idx, settings){
+function searchMusic(Artist, songTitle, info, actv, idx, settings){
     if(config.db_select == 'mongo'){
         const music = new mongoConn.Mongo();
-        return music.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
+        return music.searchMusic(Artist, songTitle, info, actv, idx, settings);
     } else if(config.db_select == 'dynamo'){
         if(config.db_mapper == 'dynamoose'){
             const music = new dynaConn.Dynamoose();
-            return music.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
+            return music.searchMusic(Artist, songTitle, info, actv, idx, settings);
         } else if(config.db_mapper == 'aws_sdk'){
             const music = new sdkConn.SDK();
-            return music.searchMusic(id, Artist, songTitle, info, actv, idx, settings);
+            return music.searchMusic(Artist, songTitle, info, actv, idx, settings);
         }
     }
 }
 
-function queryMusic(id, Artist, songTitle, info, actv, idx, settings){
+function queryMusic(Artist, songTitle, info, actv, idx, settings){
     if(config.db_select == 'mongo'){
         const music = new mongoConn.Mongo();
-        return music.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
+        return music.queryMusic(Artist, songTitle, info, actv, idx, settings);
     } else if(config.db_select == 'dynamo'){
         if(config.db_mapper == 'dynamoose'){
             const music = new dynaConn.Dynamoose();
-            return music.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
+            return music.queryMusic(Artist, songTitle, info, actv, idx, settings);
         } else if(config.db_mapper == 'aws_sdk'){
             const music = new sdkConn.SDK();
-            return music.queryMusic(id, Artist, songTitle, info, actv, idx, settings);
+            return music.queryMusic(Artist, songTitle, info, actv, idx, settings);
         }
     }
 }
