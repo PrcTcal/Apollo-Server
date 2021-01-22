@@ -54,7 +54,6 @@ class SDK{
                                 TableName: config.aws_table_name,
                                 Item: {
                                     dummy: 0,
-                                    d2: result.ScannedCount.toString(),
                                     id: uuid.v4(),
                                     Artist: Artist,
                                     songTitle: songTitle,
@@ -108,11 +107,11 @@ class SDK{
                                 TableName: config.aws_table_name,
                                 Key: {
                                     // test01-music 테이블용
-                                    //"id": result['Items'][0].id
+                                    "id": result['Items'][0].id
 
                                     // test01-music2 테이블용
-                                    "dummy": 0,
-                                    "d2": result['Items'][0].d2
+                                    //"dummy": 0,
+                                    //"d2": result['Items'][0].d2
                                 },
                                 UpdateExpression: "set " + updExpression
                             };
@@ -158,11 +157,11 @@ class SDK{
                                 TableName: config.aws_table_name,
                                 Key: {
                                     // test01-music 테이블용
-                                    //"id": result['Items'][0].id
+                                    "id": result['Items'][0].id
 
                                     // test01-music2 테이블용
-                                    "dummy": 0,
-                                    "d2": result['Items'][0].d2
+                                    //"dummy": 0,
+                                    //"d2": result['Items'][0].d2
                                 }
                             };
                             docClient.delete(params, (delerr) => {
@@ -266,6 +265,11 @@ class SDK{
                 };
                 let input = {"Artist":Artist, "songTitle":songTitle, "info":info, "actv":actv, "idx":idx};
                 let filterExp = '', attName = {}, attVal = {};
+                if(settings != null){
+                    if(settings.stype != null) params.IndexName = settings.stype + '-index';
+                    if(settings.dir != null) params.ScanIndexForward = settings.dir == 'ASC' ? true : false;
+                    if(settings.page != null) params.Limit = settings.page > 1 ? 5 * (settings.page-1) : 5;
+                }
                 attVal[':dummy'] = 0;
                 for(let item in input){
                     if(item == 'info'){
@@ -306,27 +310,27 @@ class SDK{
                     params.ExpressionAttributeNames = attName;
                 }
                 params.ExpressionAttributeValues = attVal;
+                
+
                 docClient.query(params, function(err, data) {
                     if (err) {
                         return reject(err);
                     } else {
+                        console.log(data.LastEvaluatedKey);
                         if(settings != null){
-                            if(settings.dir != null && settings.stype != null){
-                                data['Items'].sort((a, b) => {
-                                    return settings.dir == 'ASC' ? (a[settings.stype] > b[settings.stype] ? 1 : -1) : (a[settings.stype] < b[settings.stype] ? 1 : -1);
-                                });
-                            }
-                            if(settings.page != null){
-                                let temp = new Array();
-                                let endIndex = data['Items'].length > settings.page * 5 ? settings.page * 5 : data['Items'].length;
-                                for(let i = (settings.page - 1) * 5 ; i < endIndex  ; i++){
-                                    temp.push(data['Items'][i]);
-                                }
-                                data['Items'] = temp;
+                            if(settings.page != null && data.LastEvaluatedKey != null){
+                                if(settings.page > 1) params.ExclusiveStartKey = data.LastEvaluatedKey;
+                                params.Limit = 5;
                             }
                         }
-                        
-                        return resolve(data['Items']);
+                        console.log(params);
+                        docClient.query(params, (reserr, result) => {
+                            if(reserr){
+                                return reject(reserr);
+                            } else {
+                                return resolve(result['Items']);
+                            }
+                        });
                     }
                 });
             });
