@@ -138,9 +138,13 @@ class Dynamoose{
         }
 
         this.queryMusic = async (Artist, songTitle, info, actv, idx, settings) => {
-            let music = await MusicModel.query("dummy").eq(0);
+            //let music = await MusicModel.query("dummy").eq(0);
+            let music, temp;
             let cond = new dynamoose.Condition();
             let input = {"Artist":Artist, "songTitle":songTitle, "info":info, "actv":actv, "idx":idx};
+            if(settings != null){
+                music = settings.stype != null ? MusicModel.query("dummy").eq(0).using(settings.stype + '-index') : MusicModel.query("dummy").eq(0);
+            }
             for(let item in input){
                 if(item == 'info'){
                     for(let it in input[item]){
@@ -152,30 +156,26 @@ class Dynamoose{
                     }
                 } else {
                     if(settings != null){
-                        if(input[item] != null) settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where(item).eq(input[item]);
+                        if(input[item] != null && settings.stype != item) settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where(item).eq(input[item]);
                     } else {
-                        if(input[item] != null) music.and().where(item).eq(input[item]);
+                        if(input[item] != null && settings.stype != item) music.and().where(item).eq(input[item]);
                     }
                 }
             }
             if(cond.settings.conditions.length > 0) music.and().parenthesis(cond);
+            if(settings != null){
+                if(settings.dir != null){
+                    settings.dir == "ASC" ? music.sort("ascending") : music.sort("descending");
+                }
+                if(settings.page != null) {
+                    music.limit(settings.page == 1 ? 5 : 5 * (settings.page - 1));
+                    temp = music;
+                }
+            }
             
             music = await music.exec();
-            
             if(settings != null){
-                if(settings.dir != null && settings.stype != null){
-                    music.sort((a, b) => {
-                        return settings.dir == 'ASC' ? (a[settings.stype] > b[settings.stype] ? 1 : -1) : (a[settings.stype] < b[settings.stype] ? 1 : -1);
-                    });
-                }
-                if(settings.page != null){
-                    let temp = new Array();
-                    let endIndex = music.length > settings.page * 5 ? settings.page * 5 : music.length;
-                    for(let i = (settings.page - 1) * 5 ; i < endIndex  ; i++){
-                        temp.push(music[i]);
-                    }
-                    music = temp;
-                }
+                if(settings.page != null && settings.page > 1) music = await temp.startAt(music.lastKey).exec();
             }
             
             return music;

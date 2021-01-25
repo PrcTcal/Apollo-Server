@@ -261,10 +261,10 @@ class SDK{
                 let docClient = new AWS.DynamoDB.DocumentClient();
                 let params = {
                     TableName: config.aws_table_name,
-                    KeyConditionExpression: "dummy = :dummy"
+                    //KeyConditionExpression: "dummy = :dummy"
                 };
                 let input = {"Artist":Artist, "songTitle":songTitle, "info":info, "actv":actv, "idx":idx};
-                let filterExp = '', attName = {}, attVal = {};
+                let filterExp = '', keyExp = "dummy = :dummy", attName = {}, attVal = {};
                 if(settings != null){
                     if(settings.stype != null) params.IndexName = settings.stype + '-index';
                     if(settings.dir != null) params.ScanIndexForward = settings.dir == 'ASC' ? true : false;
@@ -292,38 +292,45 @@ class SDK{
                         }  
                     } else {
                         if(input[item] != null){
-                            if(filterExp != '') {
+                            if(filterExp != '' && item != settings.stype) {
                                 if(settings != null){
                                     filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                                 } else {
                                     filterExp += ' and ';
                                 }
                             }
-                            filterExp += '#' + item + ' = :' + item;
+                            
+                            if(settings.stype != null){
+                                if(item == settings.stype) keyExp += ' and #' + settings.stype + ' = :' + settings.stype;
+                            }
+                            
+                            if(item != settings.stype) {
+                                filterExp += '#' + item + ' = :' + item; 
+                                
+                            }
                             attName['#' + item] = item;
                             attVal[':' + item] = input[item];
                         }
                     }
                 }
-                if(filterExp) {
-                    params.FilterExpression = filterExp;
-                    params.ExpressionAttributeNames = attName;
-                }
-                params.ExpressionAttributeValues = attVal;
-                
-
+                params.KeyConditionExpression = keyExp;
+                if(filterExp != '') params.FilterExpression = filterExp;
+                if(Object.keys(attName).length > 0) params.ExpressionAttributeNames = attName;
+                if(Object.keys(attVal).length > 0) params.ExpressionAttributeValues = attVal;
+                console.log(params);
                 docClient.query(params, function(err, data) {
                     if (err) {
                         return reject(err);
                     } else {
-                        console.log(data.LastEvaluatedKey);
+                        //console.log(data);
+                        //console.log(data.LastEvaluatedKey);
                         if(settings != null){
                             if(settings.page != null && data.LastEvaluatedKey != null){
                                 if(settings.page > 1) params.ExclusiveStartKey = data.LastEvaluatedKey;
                                 params.Limit = 5;
                             }
                         }
-                        console.log(params);
+                        //console.log(params);
                         docClient.query(params, (reserr, result) => {
                             if(reserr){
                                 return reject(reserr);
