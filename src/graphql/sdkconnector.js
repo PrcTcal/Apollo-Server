@@ -261,14 +261,18 @@ class SDK{
                 let docClient = new AWS.DynamoDB.DocumentClient();
                 let params = {
                     TableName: config.aws_table_name,
-                    //KeyConditionExpression: "dummy = :dummy"
+                    KeyConditionExpression: "dummy = :dummy"
                 };
                 let input = {"Artist":Artist, "songTitle":songTitle, "info":info, "actv":actv, "idx":idx};
-                let filterExp = '', keyExp = "dummy = :dummy", attName = {}, attVal = {};
+                let filterExp = '', attName = {}, attVal = {};
                 if(settings != null){
                     if(settings.stype != null) params.IndexName = settings.stype + '-index';
                     if(settings.dir != null) params.ScanIndexForward = settings.dir == 'ASC' ? true : false;
-                    if(settings.page != null) params.Limit = settings.page > 1 ? 5 * (settings.page-1) : 5;
+                    if(settings.page != null) {
+                        if(Artist == null && songTitle == null && info == null && actv == null && idx == null){
+                            params.Limit = settings.page > 1 ? 5 * (settings.page-1) : 5;
+                        }
+                    }
                 }
                 attVal[':dummy'] = 0;
                 for(let item in input){
@@ -292,7 +296,7 @@ class SDK{
                         }  
                     } else {
                         if(input[item] != null){
-                            if(filterExp != '' && item != settings.stype) {
+                            if(filterExp != '') {
                                 if(settings != null){
                                     filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                                 } else {
@@ -301,43 +305,50 @@ class SDK{
                             }
                             
                             if(settings.stype != null){
-                                if(item == settings.stype) keyExp += ' and #' + settings.stype + ' = :' + settings.stype;
+                                if(item == settings.stype) {
+                                    filterExp += '#srch' + item + ' = :srch' + item;
+                                    attName['#srch' + item] = 'srch' + item;
+                                    attVal[':srch' + item] = input[item];
+                                } else {
+                                    filterExp += '#' + item + ' = :' + item; 
+                                    attName['#' + item] = item;
+                                    attVal[':' + item] = input[item];
+                                }
                             }
-                            
-                            if(item != settings.stype) {
-                                filterExp += '#' + item + ' = :' + item; 
-                                
-                            }
-                            attName['#' + item] = item;
-                            attVal[':' + item] = input[item];
                         }
                     }
                 }
-                params.KeyConditionExpression = keyExp;
                 if(filterExp != '') params.FilterExpression = filterExp;
                 if(Object.keys(attName).length > 0) params.ExpressionAttributeNames = attName;
                 if(Object.keys(attVal).length > 0) params.ExpressionAttributeValues = attVal;
-                console.log(params);
+                //console.log(params);
                 docClient.query(params, function(err, data) {
                     if (err) {
                         return reject(err);
                     } else {
-                        //console.log(data);
-                        //console.log(data.LastEvaluatedKey);
                         if(settings != null){
-                            if(settings.page != null && data.LastEvaluatedKey != null){
-                                if(settings.page > 1) params.ExclusiveStartKey = data.LastEvaluatedKey;
-                                params.Limit = 5;
+                            if(settings.page != null){
+                                if(Artist == null && songTitle == null && info == null && actv == null && idx == null){
+                                    if(settings.page > 1) params.ExclusiveStartKey = data.LastEvaluatedKey;
+                                    params.Limit = 5;
+                                    docClient.query(params, (reserr, result) => {
+                                        if(reserr){
+                                            return reject(reserr);
+                                        } else {
+                                            return resolve(result['Items']);
+                                        }
+                                    });
+                                } else {
+                                    let rs = [];
+                                    for(let i = 5 * (settings.page - 1) ; i < 5 * settings.page && i < data.Count ; i++){
+                                        rs.push(data['Items'][i]);
+                                    }
+                                    return resolve(rs);
+                                }
+                            } else {
+                                return resolve(data['Items']);
                             }
                         }
-                        //console.log(params);
-                        docClient.query(params, (reserr, result) => {
-                            if(reserr){
-                                return reject(reserr);
-                            } else {
-                                return resolve(result['Items']);
-                            }
-                        });
                     }
                 });
             });
