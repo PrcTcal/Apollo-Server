@@ -276,24 +276,22 @@ class SDK{
                 }
                 attVal[':dummy'] = 0;
                 for(let item in input){
-                    if(item == 'info'){
-                        if(input[item] != null){
-                            if(Object.keys(input[item]).length > 0) attName['#info'] = 'info';
-                            for(let it in input[item]){
-                                if(input[item][it]){
-                                    if(filterExp != '') {
-                                        if(settings != null){
-                                            filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
-                                        } else {
-                                            filterExp += ' and ';
-                                        }
+                    if (item == 'info' && input[item] != null) {
+                        if (Object.keys(input[item]).length > 0) attName['#info'] = 'info';
+                        for (let it in input[item]) {
+                            if (input[item][it]) {
+                                if (filterExp != '') {
+                                    if (settings != null) {
+                                        filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
+                                    } else {
+                                        filterExp += ' and ';
                                     }
-                                    filterExp += '#info.#' + it + ' = :' + it;
-                                    attName['#' + it] = it;
-                                    attVal[':' + it] = input[item][it];
                                 }
+                                filterExp += '#info.#' + it + ' = :' + it;
+                                attName['#' + it] = it;
+                                attVal[':' + it] = input[item][it];
                             }
-                        }  
+                        }
                     } else {
                         if(input[item] != null){
                             if(filterExp != '') {
@@ -329,15 +327,23 @@ class SDK{
                         if(settings != null){
                             if(settings.page != null){
                                 if(Artist == null && songTitle == null && info == null && actv == null && idx == null){
-                                    if(settings.page > 1) params.ExclusiveStartKey = data.LastEvaluatedKey;
-                                    params.Limit = 5;
-                                    docClient.query(params, (reserr, result) => {
-                                        if(reserr){
-                                            return reject(reserr);
+                                    if(settings.page > 1) {
+                                        if(data.LastEvaluatedKey != null){
+                                            params.ExclusiveStartKey = data.LastEvaluatedKey;
+                                            params.Limit = 5;
+                                            docClient.query(params, (reserr, result) => {
+                                                if(reserr){
+                                                    return reject(reserr);
+                                                } else {
+                                                    return resolve(result['Items']);
+                                                }
+                                            });
                                         } else {
-                                            return resolve(result['Items']);
-                                        }
-                                    });
+                                            return resolve([]);
+                                        } 
+                                    } else {
+                                        return resolve(data['Items']);
+                                    }
                                 } else {
                                     let rs = [];
                                     for(let i = 5 * (settings.page - 1) ; i < 5 * settings.page && i < data.Count ; i++){

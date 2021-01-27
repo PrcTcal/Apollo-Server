@@ -138,7 +138,7 @@ class Dynamoose{
         }
 
         this.queryMusic = async (Artist, songTitle, info, actv, idx, settings) => {
-            //let music = await MusicModel.query("dummy").eq(0);
+            let rs = [];
             let music, temp;
             let cond = new dynamoose.Condition();
             let input = {"Artist":Artist, "songTitle":songTitle, "info":info, "actv":actv, "idx":idx};
@@ -146,19 +146,24 @@ class Dynamoose{
                 music = settings.stype != null ? MusicModel.query("dummy").eq(0).using(settings.stype + '-index') : MusicModel.query("dummy").eq(0);
             }
             for(let item in input){
-                if(item == 'info'){
-                    for(let it in input[item]){
-                        if(settings != null){
-                            if(input[item][it] != null) settings.and || settings.and == null ? music.and().where('info.' + it).eq(input[item][it]) : cond.or().where('info.' + it).eq(input[item][it]);
-                        } else {
-                            if(input[item][it] != null) music.and().where('info.' + it).eq(input[item][it]);
+                if(input[item] != null){
+                    if(item == 'info'){
+                        for(let it in input[item]){
+                            if(input[item][it] != null){
+                                if(settings != null){
+                                    settings.and || settings.and == null ? music.and().where('info.' + it).eq(input[item][it]) : cond.or().where('info.' + it).eq(input[item][it]);
+                                } else {
+                                    music.and().where('info.' + it).eq(input[item][it]);
+                                }
+                            }
                         }
-                    }
-                } else {
-                    if(settings != null){
-                        if(input[item] != null && settings.stype != item) settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where(item).eq(input[item]);
                     } else {
-                        if(input[item] != null && settings.stype != item) music.and().where(item).eq(input[item]);
+                        if(settings != null && settings.stype != null && input[item] != null){
+                            if(settings.stype != item) settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where(item).eq(input[item]);
+                            else settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where('srch' + item).eq(input[item]);
+                        } else {
+                            if(settings.stype != item) music.and().where(item).eq(input[item]);
+                        }
                     }
                 }
             }
@@ -168,14 +173,29 @@ class Dynamoose{
                     settings.dir == "ASC" ? music.sort("ascending") : music.sort("descending");
                 }
                 if(settings.page != null) {
-                    music.limit(settings.page == 1 ? 5 : 5 * (settings.page - 1));
-                    temp = music;
+                    if(Artist == null && songTitle == null && info == null && actv == null && idx == null){
+                        music.limit(settings.page == 1 ? 5 : 5 * (settings.page - 1));
+                        temp = music;
+                    }
                 }
             }
             
             music = await music.exec();
-            if(settings != null){
-                if(settings.page != null && settings.page > 1) music = await temp.startAt(music.lastKey).exec();
+            if(settings != null && settings.page != null){
+                if(Artist == null && songTitle == null && info == null && actv == null && idx == null){
+                    if(settings.page > 1){
+                        if(music.lastKey != null) { 
+                            music = await temp.startAt(music.lastKey).exec();
+                        } else {
+                            music = [];
+                        }
+                    }
+                } else {
+                    for(let i = 5 * (settings.page - 1) ; i < settings.page * 5 && i < music.count ; i++){
+                        rs.push(music[i]);
+                    }
+                    music = rs;
+                }
             }
             
             return music;
