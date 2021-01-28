@@ -62,11 +62,11 @@ class SDK{
                                     idx: idx
                                 }
                             };
-                            docClient.put(params, (puterr) => {
-                                if(puterr){
-                                    return reject(puterr);
+                            docClient.put(params, (err) => {
+                                if(err){
+                                    return reject(err);
                                 } else {
-                                    return resolve(true);
+                                    return resolve(params.Item)
                                 }
                             });
                         } else {
@@ -107,21 +107,22 @@ class SDK{
                                 TableName: config.aws_table_name,
                                 Key: {
                                     // test01-music 테이블용
-                                    "id": result['Items'][0].id
+                                    //"id": result['Items'][0].id
 
                                     // test01-music2 테이블용
-                                    //"dummy": 0,
-                                    //"d2": result['Items'][0].d2
+                                    "dummy": 0,
+                                    "id": result['Items'][0].id
                                 },
-                                UpdateExpression: "set " + updExpression
+                                UpdateExpression: "set " + updExpression,
+                                ExpressionAttributeValues: updFields,
+                                ReturnValues: "ALL_NEW"
                             };
-                            params.ExpressionAttributeValues = updFields
 
-                            docClient.update(params, (upderr) => {
+                            docClient.update(params, (upderr, data) => {
                                 if(upderr){
                                     return reject(upderr);
                                 } else {
-                                    return resolve(true);
+                                    return resolve(data.Attributes);
                                 }
                             });
                         } else {
@@ -149,7 +150,7 @@ class SDK{
                         ":key": id
                     }
                 };
-                
+                console.log(params);
                 docClient.scan(params, (scanerr, result) => {
                     if(!scanerr){
                         if(result.Count > 0){
@@ -157,20 +158,24 @@ class SDK{
                                 TableName: config.aws_table_name,
                                 Key: {
                                     // test01-music 테이블용
-                                    "id": result['Items'][0].id
+                                    //"id": result['Items'][0].id
 
                                     // test01-music2 테이블용
-                                    //"dummy": 0,
-                                    //"d2": result['Items'][0].d2
-                                }
+                                    "dummy": 0,
+                                    "id": result['Items'][0].id
+                                },
+                                ReturnValues: "ALL_OLD"
                             };
-                            docClient.delete(params, (delerr) => {
+                            console.log(params);
+                            
+                            docClient.delete(params, (delerr, data) => {
                                 if(delerr){
                                     return reject(delerr);
                                 } else {
-                                    return resolve(true);
+                                    return resolve(data.Attributes);
                                 }
                             });
+                            
                         } else {
                             return reject(new Error("No data found"));
                         }
@@ -293,25 +298,22 @@ class SDK{
                             }
                         }
                     } else {
-                        if(input[item] != null){
-                            if(filterExp != '') {
-                                if(settings != null){
+                        if (input[item] != null) {
+                            if (filterExp != '') {
+                                if (settings != null) {
                                     filterExp += settings.and || settings.and == null ? ' and ' : ' or ';
                                 } else {
                                     filterExp += ' and ';
                                 }
                             }
-                            
-                            if(settings.stype != null){
-                                if(item == settings.stype) {
-                                    filterExp += '#srch' + item + ' = :srch' + item;
-                                    attName['#srch' + item] = 'srch' + item;
-                                    attVal[':srch' + item] = input[item];
-                                } else {
-                                    filterExp += '#' + item + ' = :' + item; 
-                                    attName['#' + item] = item;
-                                    attVal[':' + item] = input[item];
-                                }
+                            if (settings != null && item == settings.stype) {
+                                filterExp += '#srch' + item + ' = :srch' + item;
+                                attName['#srch' + item] = 'srch' + item;
+                                attVal[':srch' + item] = input[item];
+                            } else {
+                                filterExp += '#' + item + ' = :' + item;
+                                attName['#' + item] = item;
+                                attVal[':' + item] = input[item];
                             }
                         }
                     }
@@ -319,7 +321,7 @@ class SDK{
                 if(filterExp != '') params.FilterExpression = filterExp;
                 if(Object.keys(attName).length > 0) params.ExpressionAttributeNames = attName;
                 if(Object.keys(attVal).length > 0) params.ExpressionAttributeValues = attVal;
-                //console.log(params);
+                console.log(params);
                 docClient.query(params, function(err, data) {
                     if (err) {
                         return reject(err);
@@ -332,11 +334,7 @@ class SDK{
                                             params.ExclusiveStartKey = data.LastEvaluatedKey;
                                             params.Limit = 5;
                                             docClient.query(params, (reserr, result) => {
-                                                if(reserr){
-                                                    return reject(reserr);
-                                                } else {
-                                                    return resolve(result['Items']);
-                                                }
+                                                return reserr ? reject(reserr) : resolve(result['Items']);
                                             });
                                         } else {
                                             return resolve([]);
@@ -354,6 +352,8 @@ class SDK{
                             } else {
                                 return resolve(data['Items']);
                             }
+                        } else {
+                            return resolve(data['Items']);
                         }
                     }
                 });

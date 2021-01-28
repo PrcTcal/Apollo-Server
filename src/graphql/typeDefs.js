@@ -46,7 +46,7 @@ const typeDefs = gql`
         stype: Field
         dir: Direction,
         page: Int,
-        and: Boolean
+        and: Boolean,
     }
 
     type Music{
@@ -65,9 +65,9 @@ const typeDefs = gql`
     }
 
     type Mutation{
-        createMusic(Artist:String!, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Boolean!
-        updateMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Boolean!
-        removeMusic(id:String!): Boolean!
+        createMusic(Artist:String!, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Music!
+        updateMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Music!
+        removeMusic(id:String!): Music!
     }
 `;
 

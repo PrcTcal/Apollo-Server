@@ -158,9 +158,8 @@ class Dynamoose{
                             }
                         }
                     } else {
-                        if(settings != null && settings.stype != null && input[item] != null){
-                            if(settings.stype != item) settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where(item).eq(input[item]);
-                            else settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : cond.or().where('srch' + item).eq(input[item]);
+                        if(settings != null && input[item] != null){
+                            settings.and || settings.and == null ? music.and().where(item).eq(input[item]) : (settings.stype != item || settings.stype == null ? cond.or().where(item).eq(input[item]) : cond.or().where('srch' + item).eq(input[item]));
                         } else {
                             if(settings.stype != item) music.and().where(item).eq(input[item]);
                         }
