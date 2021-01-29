@@ -59,7 +59,10 @@ class SDK{
                                     songTitle: songTitle,
                                     info: info,
                                     actv: actv,
-                                    idx: idx
+                                    idx: idx,
+                                    srchArtist: Artist,
+                                    srchidx: idx,
+                                    srchsongTitle: songTitle
                                 }
                             };
                             docClient.put(params, (err) => {
@@ -98,11 +101,23 @@ class SDK{
                     if(!scanerr){
                         if(result.Count > 0){
                             let updExpression = '';
-                            if(Artist) {updFields[':Artist'] = Artist; updExpression += 'Artist = :Artist ';}
-                            if(songTitle) {updFields[':songTitle'] = songTitle; updExpression += updExpression != '' ? ', songTitle = :songTitle ' : 'songTitle = :songTitle '; }  
+                            if(Artist) {
+                                updFields[':Artist'] = Artist; 
+                                updFields[':srchArtist'] = Artist;
+                                updExpression += 'Artist = :Artist, srchArtist = :srchArtist ';
+                            }
+                            if(songTitle) {
+                                updFields[':songTitle'] = songTitle; 
+                                updFields[':srchsongTitle'] = songTitle;
+                                updExpression += updExpression != '' ? ', songTitle = :songTitle, srchsongTitle = :srchsongTitle ' : 'songTitle = :songTitle, srchsongTitle = :srchsongTitle '; 
+                            }  
                             if(info) {updFields[':info'] = info; updExpression += updExpression != '' ? ', info = :info ' : 'info = :info ';}
                             if(actv != null) {updFields[':actv'] = actv; updExpression += updExpression != '' ? ', actv = :actv ' : 'actv = :actv ';}
-                            if(idx) {updFields[':idx'] = idx; updExpression += updExpression != '' ? ', idx = :idx ' : 'idx = :idx ';}
+                            if(idx) {
+                                updFields[':idx'] = idx; 
+                                updFields[':srchidx'] = idx;
+                                updExpression += updExpression != '' ? ', idx = :idx, srchidx = :srchidx ' : 'idx = :idx, srchidx = :srchidx ';
+                            }
                             params = {
                                 TableName: config.aws_table_name,
                                 Key: {

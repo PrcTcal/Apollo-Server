@@ -9,11 +9,10 @@ if(config.db_select == 'dynamo'){
             type: Number,
             hashKey: true
         },
-        d2: {
+        id: {
             type: String,
             rangeKey:true
         },
-        id: String,
         Artist: String,
         songTitle: String,
         hometown: String,
@@ -21,7 +20,10 @@ if(config.db_select == 'dynamo'){
         album: String,
         release: String,
         actv: Boolean,
-        idx: Number    
+        idx: Number,
+        srchArtist: String,
+        srchidx: Number,
+        srchsongTitle: String
     },
     {
         useDocumentTypes: true,

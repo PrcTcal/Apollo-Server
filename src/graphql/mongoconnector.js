@@ -20,7 +20,7 @@ class Mongo{
                         if(data == null){
                             music.save((saveerr) => {
                                 if(saveerr) return reject(saveerr);
-                                return resolve(true);
+                                return resolve(music);
                             });
                         } else {
                             return reject(new Error("Duplicated Data"));
@@ -46,7 +46,7 @@ class Mongo{
                                 if(saveerr) {
                                     return reject(saveerr);
                                 } else {
-                                    return resolve(true);
+                                    return resolve(data);
                                 }
                             });
                         } else {
@@ -68,7 +68,7 @@ class Mongo{
                                 if(remerr){
                                     return reject(remerr);
                                 } else {
-                                    return resolve(true);
+                                    return resolve(data);
                                 }
                             });
                         } else {
