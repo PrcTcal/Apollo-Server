@@ -124,6 +124,49 @@ class Mongo{
             return music;
         }
 
+        this.queryMusic = (Artist, songTitle, info, actv, idx, settings) => {
+            let music, srchType = {}, orParams = [], sortType = {};
+
+            if(settings.and || settings.and == null){
+                if(Artist) srchType['Artist'] = Artist;
+                if(songTitle) srchType['songTitle'] = songTitle;
+                if(info){
+                    if(info.hometown) srchType['info.hometown'] = info.hometown;
+                    if(info.birth) srchType['info.birth'] = info.birth;
+                    if(info.album) srchType['info.album'] = info.album;
+                    if(info.release) srchType['info.release'] = info.release;
+                }
+                if(actv != null) srchType['actv'] = actv;
+                if(idx) srchType['idx'] = idx;
+            } else {
+                if(Artist) orParams.push({"Artist":Artist});
+                if(songTitle) orParams.push({"songTitle":songTitle});
+                if(info){
+                    if(info.hometown) orParams.push({"info.hometown":info.hometown});
+                    if(info.birth) orParams.push({"info.birth":info.birth});
+                    if(info.album) orParams.push({"info.album":info.album});
+                    if(info.release) orParams.push({"info.release":info.release});
+                }
+                if(actv != null) orParams.push({"actv":actv});
+                if(idx) orParams.push({"idx":idx});
+                if(orParams.length > 0) srchType = {$or: orParams};
+            }
+        
+            if(settings != null){
+                if(settings.stype != null){
+                    if(['hometown','birth','album','release'].find(ele => ele == settings.stype) != null){
+                        sortType['info.' + settings.stype] = settings.dir == 'ASC' ? 1 : -1;
+                    } else {
+                        sortType[settings.stype] = settings.dir == 'ASC' ? 1 : -1;
+                    }
+                }
+            }
+            music = MusicModel.find(srchType)
+            settings.page != null ? music.limit(5).skip((settings.page-1) * 5).sort(sortType) : music.sort(sortType);
+            
+            return music;
+        }
+
     }
 }
 
