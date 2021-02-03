@@ -341,6 +341,7 @@ class SDK{
                     if (err) {
                         return reject(err);
                     } else {
+                        console.log(data.Count);
                         if(settings != null){
                             if(settings.page != null){
                                 if(Artist == null && songTitle == null && info == null && actv == null && idx == null){

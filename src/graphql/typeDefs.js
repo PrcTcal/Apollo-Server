@@ -58,6 +58,18 @@ const typeDefs = gql`
         songTitle: String
     }
 
+    enum Database{
+        mongo
+        dynamo
+    }
+
+    input Migration{
+        srcDB: Database
+        destDB: Database
+        src: String
+        dest: String
+    }
+
     type Query{
         getMusic(id:String!):Music
         searchMusic(Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx:Int, settings:Setting):[Music]!
@@ -68,6 +80,8 @@ const typeDefs = gql`
         createMusic(Artist:String!, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Music!
         updateMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Music!
         removeMusic(id:String!): Music!
+        migrateMusic(settings:Migration):Boolean!
+        createTable(settings:Migration):Boolean!
     }
 `;
 

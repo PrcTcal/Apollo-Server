@@ -1,4 +1,5 @@
 import inter from './interface';
+import Migration from './migration';
 
 const resolvers = {
     Info: {
@@ -32,6 +33,14 @@ const resolvers = {
         },
         removeMusic: (_, {id}) => {
             return inter.removeMusic(id);
+        },
+        migrateMusic: (_, {settings}) => {
+            const migration = new Migration();
+            return migration.migrateMusic(settings);
+        },
+        createTable: (_, {settings}) => {
+            const migration = new Migration();
+            return migration.createTable(settings);
         }
     }
 };

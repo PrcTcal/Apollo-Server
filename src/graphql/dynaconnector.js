@@ -5,16 +5,16 @@ const uuid = require('uuid');
 class Dynamoose{
     constructor(){
         this.getMusic = async (id) => {
-            const music = await MusicModel.scan({'id':id}).exec();
+            const music = await MusicModel.music.scan({'id':id}).exec();
             return music[0];
         }
 
         this.createMusic = (Artist, songTitle, info, actv, idx) => {
             return new Promise((resolve, reject) => {
-                MusicModel.scan({'Artist':Artist, 'songTitle':songTitle}).exec((scanerr, result) => {
+                MusicModel.music.scan({'Artist':Artist, 'songTitle':songTitle}).exec((scanerr, result) => {
                     if(!scanerr){
                         if(result.count == 0){
-                            MusicModel.create({'dummy':0, 'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx, 'srchArtist':Artist, 'srchidx':idx, 'srchsongTitle':songTitle}, (creerr, data)=>{
+                            MusicModel.music.create({'dummy':0, 'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx, 'srchArtist':Artist, 'srchidx':idx, 'srchsongTitle':songTitle}, (creerr, data)=>{
                                 if(creerr){
                                     return reject(creerr);
                                 } else {
@@ -40,13 +40,13 @@ class Dynamoose{
             if(actv != null) setVal['actv'] = actv;
             if(idx) { setVal['idx'] = idx; setVal['srchidx'] = idx; }
             try{
-                entity = await MusicModel.scan({'id':id}).exec();
+                entity = await MusicModel.music.scan({'id':id}).exec();
                 if(entity.count > 0){
                     // test01-music 테이블용
                     //music = await MusicModel.update({'id':id}, {"$SET": setVal});
 
                     // test01-music2 테이블용
-                    music = await MusicModel.update({'dummy':0, 'id':entity[0].id}, {"$SET": setVal});
+                    music = await MusicModel.music.update({'dummy':0, 'id':entity[0].id}, {"$SET": setVal});
                     return music;                    
                 } else {
                     return new Error('No data found');
@@ -59,13 +59,13 @@ class Dynamoose{
         this.removeMusic = async (id) => {
             let entity;
             try{
-                entity = await MusicModel.scan({'id':id}).exec();
+                entity = await MusicModel.music.scan({'id':id}).exec();
                 if(entity.count > 0){
                     // test01-music 테이블용
                     //await MusicModel.delete(entity[0].id);
 
                     // test01-music2 테이블용
-                    await MusicModel.delete({'dummy':0, 'id':entity[0].id});
+                    await MusicModel.music.delete({'dummy':0, 'id':entity[0].id});
                     return entity[0];
                 } else {
                     return new Error("No data found");
@@ -86,7 +86,7 @@ class Dynamoose{
                                 if(settings.and || settings.and == null){
                                     srchType['info.' + it] = input[item][it];
                                 } else {
-                                    music = music != null ? music.or().where('info.' + it).eq(input[item][it]) : MusicModel.scan('info.' + it).eq(input[item][it]);
+                                    music = music != null ? music.or().where('info.' + it).eq(input[item][it]) : MusicModel.music.scan('info.' + it).eq(input[item][it]);
                                 } 
                             } else {
                                 srchType['info.' + it] = input[item][it];
@@ -97,7 +97,7 @@ class Dynamoose{
                             if(settings.and || settings.and == null){
                                 if(input[item] != null) srchType[item] = input[item];
                             } else {
-                                if(input[item] != null) music = music ? music.or().where(item).eq(input[item]) : MusicModel.scan(item).eq(input[item]);
+                                if(input[item] != null) music = music ? music.or().where(item).eq(input[item]) : MusicModel.music.scan(item).eq(input[item]);
                             }
                         } else {
                             if(input[item] != null) srchType[item] = input[item];
@@ -106,12 +106,12 @@ class Dynamoose{
                 }
 
                 if(settings != null){
-                    music = settings.and || settings.and == null ? await MusicModel.scan(srchType).exec() : (music ? await music.exec() : await MusicModel.scan.exec());
+                    music = settings.and || settings.and == null ? await MusicModel.music.scan(srchType).exec() : (music ? await music.exec() : await MusicModel.music.scan.exec());
                 } else {
-                    music = await MusicModel.scan(srchType).exec();
+                    music = await MusicModel.music.scan(srchType).exec();
                 }
             } else {
-                music = await MusicModel.scan().exec();
+                music = await MusicModel.music.scan().exec();
             }
        
             if(settings != null){
@@ -140,7 +140,7 @@ class Dynamoose{
             let cond = new dynamoose.Condition();
             let input = {"Artist":Artist, "songTitle":songTitle, "info":info, "actv":actv, "idx":idx};
             if(settings != null){
-                music = settings.stype != null ? MusicModel.query("dummy").eq(0).using(settings.stype + '-index') : MusicModel.query("dummy").eq(0);
+                music = settings.stype != null ? MusicModel.music.query("dummy").eq(0).using(settings.stype + '-index') : MusicModel.music.query("dummy").eq(0);
             }
             for(let item in input){
                 if(input[item] != null){

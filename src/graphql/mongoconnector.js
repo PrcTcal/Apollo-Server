@@ -5,7 +5,7 @@ class Mongo{
     constructor(){
         this.getMusic = (id) => {
             return new Promise((resolve, reject) => {
-                MusicModel.find({"id":id}, (err, data) => {
+                MusicModel.music.find({"id":id}, (err, data) => {
                     if(err) return reject(err);
                     return resolve(data[0]);
                 });
@@ -14,8 +14,8 @@ class Mongo{
 
         this.createMusic = (Artist, songTitle, info, actv, idx) => {
             return new Promise((resolve, reject) => {
-                const music = MusicModel({'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx});
-                MusicModel.findOne({'Artist': Artist, 'songTitle':songTitle}, (finderr, data) => {
+                const music = MusicModel.music({'id':uuid.v4(), 'Artist':Artist, 'songTitle':songTitle, 'info':info, 'actv':actv, 'idx':idx});
+                MusicModel.music.findOne({'Artist': Artist, 'songTitle':songTitle}, (finderr, data) => {
                     if(!finderr){
                         if(data == null){
                             music.save((saveerr) => {
@@ -34,7 +34,7 @@ class Mongo{
 
         this.updateMusic = (id, Artist, songTitle, info, actv, idx) => {
             return new Promise((resolve, reject) => {
-                MusicModel.findOne({'id':id}, (finderr, data) => {
+                MusicModel.music.findOne({'id':id}, (finderr, data) => {
                     if(!finderr){
                         if(data != null){
                             if(Artist) data.Artist = Artist;
@@ -61,7 +61,7 @@ class Mongo{
 
         this.removeMusic = (id) => {
             return new Promise((resolve, reject) => {
-                MusicModel.findOne({'id':id}, (finderr, data) => {
+                MusicModel.music.findOne({'id':id}, (finderr, data) => {
                     if(!finderr){
                         if(data != null){
                             data.remove((remerr) => {
@@ -118,7 +118,7 @@ class Mongo{
                     }
                 }
             }
-            music = MusicModel.find(srchType)
+            music = MusicModel.music.find(srchType)
             settings.page != null ? music.limit(5).skip((settings.page-1) * 5).sort(sortType) : music.sort(sortType);
             
             return music;
@@ -161,7 +161,7 @@ class Mongo{
                     }
                 }
             }
-            music = MusicModel.find(srchType)
+            music = MusicModel.music.find(srchType)
             settings.page != null ? music.limit(5).skip((settings.page-1) * 5).sort(sortType) : music.sort(sortType);
             
             return music;

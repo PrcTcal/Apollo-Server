@@ -36,13 +36,25 @@ if(config.db_select == 'mongo'){
         console.log('DB : DynamoDB - Dynamoose');
 
     }
+} else if(config.db_select == 'all'){
+    // MongoDB 연결
+    Mongoose.connect(config.mongo_local_config, config.mongo_config)
+    .then(() => console.log('Successfully connected to MongoDB'))
+    .catch(e => console.error(e));
+    Mongoose.Promise = global.Promise;
+    console.log('DB : MongoDB');
+
+    //AWS_SDK 연결 세팅
+    AWS.config.update(config.aws_remote_config);
+    // Create the DynamoDB service object
+    var ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
+    console.log('DB : DynamoDB - AWS_SDK');
 }
 
 // ApolloServer 인스턴스 생성
 const server = new ApolloServer({
     typeDefs,
     resolvers,
-    Connectors,
     dynaConn,
     sdkConn,
     mongoConn
