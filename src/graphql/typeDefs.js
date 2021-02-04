@@ -60,7 +60,8 @@ const typeDefs = gql`
 
     enum Database{
         mongo
-        dynamo
+        dynamoose
+        aws_sdk
     }
 
     input Migration{
@@ -80,8 +81,6 @@ const typeDefs = gql`
         createMusic(Artist:String!, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Music!
         updateMusic(id:String!, Artist:String, songTitle:String, info:infoInput, actv:Boolean, idx: Int): Music!
         removeMusic(id:String!): Music!
-        migrateMusic(settings:Migration):Boolean!
-        createTable(settings:Migration):Boolean!
     }
 `;
 

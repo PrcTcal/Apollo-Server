@@ -98,7 +98,7 @@ if(config.db_select == 'dynamo'){
         versionKey:false
     });
 
-    mongo_music = Mongoose.model(config.mongo_collection_name, mongo_schema);
+    mongo_music = Mongoose.model("test", mongo_schema);
     module.exports = {mongo_schema, dynamo_schema};
 }
 

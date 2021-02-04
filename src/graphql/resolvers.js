@@ -33,14 +33,6 @@ const resolvers = {
         },
         removeMusic: (_, {id}) => {
             return inter.removeMusic(id);
-        },
-        migrateMusic: (_, {settings}) => {
-            const migration = new Migration();
-            return migration.migrateMusic(settings);
-        },
-        createTable: (_, {settings}) => {
-            const migration = new Migration();
-            return migration.createTable(settings);
         }
     }
 };
