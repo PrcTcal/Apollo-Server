@@ -6,6 +6,7 @@ const AWS = require('aws-sdk');
 const uuid = require('uuid');
 const readline = require('readline');
 const fs = require('fs');
+const cluster = require('cluster');
 
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 
@@ -138,6 +139,7 @@ const deleteTable = (db, table) => {
 }
 
 
+
 const count = (db, table) => {
     return new Promise(async (resolve, reject) => {
         if(db == 'mongo'){
@@ -151,6 +153,20 @@ const count = (db, table) => {
                 ExpressionAttributeValues: { ":dummy" : 0 }
             };
             let docClient = new AWS.DynamoDB.DocumentClient();
+            let cnt = 0;
+            let dynamo_music = Dynamoose.model(table, MusicModel.dynamo_schema);
+            music = dynamo_music.scan();
+            let temp = music;
+            music = await music.exec();
+            console.log(music.count);
+            cnt += music.count;
+            while(music.lastKey != null){
+                music = await temp.startAt(music.lastKey).exec();
+                cnt += music.count;
+                console.log(cnt);
+            }
+            console.log('total : ' + cnt);
+            /*
             docClient.query(params, (err, data) => {
                 if(err){
                     return reject(err);
@@ -168,7 +184,8 @@ const count = (db, table) => {
                         return resolve(data.Count);
                     }
                 }
-            });
+            });*/
+            return resolve(cnt);
         }
     });  
 }
@@ -181,7 +198,9 @@ const exportData = (src, table) => {
 
         if(src == 'mongo'){
             mongo_music = await Mongoose.model(table, MusicModel.mongo_schema);
+            /*
             music = await mongo_music.find().select('-_id');
+            
             // mongo 6808개 -> mongo 백만개 export할 때
             for(let i = 0 ; i < 147 ; i++){
                 console.log(i);
@@ -197,9 +216,9 @@ const exportData = (src, table) => {
                 }
             }
             console.log(rs.length);
-            
-           /*
-            rs = music;
+            */
+           
+            //rs = music;
             try{
                 for(let m = 0 ; m < 10 ; m++){
                     console.log(m);
@@ -211,7 +230,7 @@ const exportData = (src, table) => {
             } catch(e){
                 return reject(e);
             }
-            */
+            
         } else {
             if(src == 'dynamoose'){
                 dynamo_music = Dynamoose.model(table, MusicModel.dynamo_schema);
@@ -368,17 +387,20 @@ const importData = (dest, table, total, m) => {
                 return resolve(true);
             } else {
                 let dynamodb = new AWS.DynamoDB();
+                let semaphore = 0;
+                let later = [];
                     let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
                     cur = 0; 
                     count = 0;
-                    total = 100000;
+                    total = 25000;
                     console.log(`inserting export${m}.json===================================`);
+                    let vari = 0;
                     while(total > 0){
                         let req = {}, Item = {};
                         req[table] = [];
                         for(let i = 0 ; i < (total > 25 ? 25 : total) ; i++){
                             Item = {
-                                "dummy": { "N": "0" },
+                                "dummy": { "N": String(vari++) },
                                 "id": { "S": rs[cur].id },
                                 "Artist": { "S": rs[cur].Artist },
                                 "songTitle": { "S": rs[cur].songTitle },
@@ -396,23 +418,41 @@ const importData = (dest, table, total, m) => {
                             };
                             req[table].push({PutRequest : { "Item": Item }});
                             cur++;
+                            if(vari % 1000 == 0) vari = 0;
                         }
                         total = total >= 25 ? total -= 25 : 0;
                         params = {
                             RequestItems: req
                         };
-    
+                        
                         let processItemCallback = async function(perr, pdata){
                             if(perr){
-                                return reject(perr);
+                                if(perr.code == 'ProvisionedThroughputExceededException') {
+                                    // perr에 requestId가 있음.
+                                    // batch를 할 당시에 리턴값인 AWS request를 map에 저장해놓고 여기서 불러오면 파라메터를 전달할 수 있지 않을까?
+                                    // perr에 code, time, requestId, statusCode, retryable이 있는데 time은 에러 발생 시간이라 AWSRequest에 없고
+                                    // requestId도 왠지모르겠는데 AWSRequest에서 찾을 수가 없음
+                                    console.log('Excpetion occurred : ' + perr.code);
+                                    //later.push(params);
+                                    semaphore--;
+                                    console.log('semaphore : ' + semaphore);
+                                    //console.log('batch failed => ' + count);
+                                    //count++;
+                                    //dynamodb.batchWriteItem(params, processItemCallback);
+                                } else {
+                                    return reject(perr);
+                                }
                             } else {
                                 if(Object.keys(pdata.UnprocessedItems).length != 0){
                                     console.log("unprocessed : " + pdata.UnprocessedItems + ", start rebatching");
                                     await sleep(500);
                                     dynamodb.batchWriteItem({RequestItems: pdata.UnprocessedItems}, processItemCallback);
                                 } else {
+                                    semaphore--;
+                                    console.log('semaphore : ' + semaphore);
                                     count++;
                                     console.log('batch success => ' + count);
+                                    if(count % 250 == 0) console.log("time consumed : " + (new Date() - start));
                                     if(count == maxCount) {
                                         let end = new Date();
                                         console.log(end - start);
@@ -421,10 +461,23 @@ const importData = (dest, table, total, m) => {
                                 }
                             }
                         };
-                        if(cur % 400 == 0) await sleep(6000);
+                        /*
+                        if(cur % 400 == 0) {
+                            await sleep(5000);
+                        } else if(cur % 15000 == 0) {
+                            await sleep(20000);
+                        }
+                        */
+                        semaphore++;
+                        
                         dynamodb.batchWriteItem(params, processItemCallback);
+                        if(semaphore == 16) console.log('stopped');
+                        while(semaphore >= 16){
+                            await sleep(200);
+                        }
+                        
                     }
-                
+                    //fs.writeFileSync('../../migrationData/later.json', JSON.stringify(later), 'utf8');
 
             }
         }
@@ -478,13 +531,14 @@ const answerCallback = async (answer) => {
 
     } else if(arr[0] == 'import'){
         if(arr.length == 3){
-            const result = await importData(arr[1], arr[2], JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"})).length, 0);
-            /*
-            for(let m = 0 ; m < 10 ; m++){
-                const result = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync("../../migrationData/export0.json", {encoding: "utf8"})).length, m);
+            //const result = await importData(arr[1], arr[2], JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"})).length, 0);
+            
+            for(let m = 0 ; m < 1 ; m++){
+                const result = await importData(arr[1], arr[2],25000, m);
+                //const result = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
                 if(result) console.log('importing process terminated successfully');
 
-            }*/
+            }
             if(result) console.log('importing process terminated successfully');
             else console.log('error occurred while executing import process');        
         } else {
