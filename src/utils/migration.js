@@ -33,10 +33,7 @@ const createTable = (db, table) => {
                     { AttributeName: "songTitle", AttributeType: "S" },
                     { AttributeName: "idx", AttributeType: "N" }
                 ],
-                ProvisionedThroughput: {       
-                    ReadCapacityUnits: 5, 
-                    WriteCapacityUnits: 5
-                },
+                BillingMode: 'PAY_PER_REQUEST',
                 LocalSecondaryIndexes: [
                     { 
                         IndexName: "Artist-index", 
@@ -251,16 +248,16 @@ const exportData = (src, table) => {
                     } 
                 }
             } else {
+                
+                let start = new Date();
                 params = {
                     TableName: table,
-                    KeyConditionExpression: "dummy = :dummy",
-                    ExpressionAttributeValues: { ":dummy" : 0 },
                     ProjectionExpression: "id, Artist, songTitle, info, idx, actv"
                 };
 
                 let checking = (doc, par) => {
                     return new Promise((resolve, reject) => {
-                        doc.query(par, (err, data) => {
+                        doc.scan(par, (err, data) => {
                             if(err){
                                 return reject(err);
                             } else {
@@ -269,7 +266,7 @@ const exportData = (src, table) => {
                         });
                     });
                 }
-                let startKey = {};
+                let startKey = {}, c = 0, m = 0;
                 while(startKey != null){
                     await checking(docClient, params).then(function(data){
                         if(data.Count == 0) return reject(new Error("There is No Data or Table"));
@@ -281,12 +278,22 @@ const exportData = (src, table) => {
                         }
                         for(let item of data.Items){
                             rs.push(item);
+                            if(rs.length == 100000){
+                                console.log(m + " exported data size : " + rs.length);
+                                if(rs.length == 0) return reject(new Error('There is No Data or Table'));
+                                fs.writeFileSync(`../../tempData/export${m++}.json`, JSON.stringify(rs), 'utf8');
+                                rs = [];
+                                console.log('writeFileSync completed');
+                            }
                         }
+                        console.log(rs.length);
                     });
-                }   
+                } 
+                console.log('consumed time : ' + (new Date() - start));
+                return resolve(true);   
             }
         }
-        
+        /*
         try{
             console.log("exported data size : " + rs.length);
             if(rs.length == 0) return reject(new Error('There is No Data or Table'));
@@ -296,7 +303,7 @@ const exportData = (src, table) => {
         } catch(e){
             return reject(e);
         }
-        
+        */
     });
 }
 
@@ -307,7 +314,7 @@ const importData = (dest, table, total, m) => {
         let cur = 0, count = 0;
         let maxCount = total % 25 == 0 ? Math.floor(total / 25) : Math.floor(total / 25) + 1;
         let params = {}, music, mongo_music, dynamo_music, retry = 0;
-        let rs = JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"}));
+        //let rs = JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"}));
         //if(rs.length == 0) return reject(new Error("There is no Data or Table"));
         if(dest == 'mongo'){
             mongo_music = Mongoose.model(table, MusicModel.mongo_schema);
@@ -386,98 +393,97 @@ const importData = (dest, table, total, m) => {
                 }
                 return resolve(true);
             } else {
+                AWS.events.on('retry', function(resp) {
+                    if(resp.retryCount > 5) console.log(resp.error.requestId + ' - current retry count : ' + resp.retryCount);
+                });
                 let dynamodb = new AWS.DynamoDB();
                 let semaphore = 0;
                 let later = [];
-                    let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
-                    cur = 0; 
-                    count = 0;
-                    total = 25000;
-                    console.log(`inserting export${m}.json===================================`);
-                    let vari = 0;
-                    while(total > 0){
-                        let req = {}, Item = {};
-                        req[table] = [];
-                        for(let i = 0 ; i < (total > 25 ? 25 : total) ; i++){
-                            Item = {
-                                "dummy": { "N": String(vari++) },
-                                "id": { "S": rs[cur].id },
-                                "Artist": { "S": rs[cur].Artist },
-                                "songTitle": { "S": rs[cur].songTitle },
-                                "info": { 
-                                    "M": {
-                                        "album": { "S": rs[cur].info.album },
-                                        "release": { "S": rs[cur].info.release }
-                                    } 
-                                },
-                                "actv": { "BOOL": rs[cur].actv },
-                                "idx": { "N": String(rs[cur].idx) },
-                                "srchArtist": { "S": rs[cur].Artist },
-                                "srchsongTitle": { "S": rs[cur].songTitle },
-                                "srchidx": { "N": String(rs[cur].idx) }
-                            };
-                            req[table].push({PutRequest : { "Item": Item }});
-                            cur++;
-                            if(vari % 1000 == 0) vari = 0;
-                        }
-                        total = total >= 25 ? total -= 25 : 0;
-                        params = {
-                            RequestItems: req
+                let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
+                cur = 0; 
+                count = 0;
+                console.log(`inserting export${m}.json===================================`);
+                let vari = 0;
+                while(total > 0){
+                    let req = {}, Item = {};
+                    req[table] = [];
+                    for(let i = 0 ; i < (total > 25 ? 25 : total) ; i++){
+                        Item = {
+                            "dummy": { "N": String(vari++) },
+                            "id": { "S": rs[cur].id },
+                            "Artist": { "S": rs[cur].Artist },
+                            "songTitle": { "S": rs[cur].songTitle },
+                            "info": { 
+                                "M": {
+                                    "album": { "S": rs[cur].info.album },
+                                    "release": { "S": rs[cur].info.release }
+                                } 
+                            },
+                            "actv": { "BOOL": rs[cur].actv },
+                            "idx": { "N": String(rs[cur].idx) },
+                            "srchArtist": { "S": rs[cur].Artist },
+                            "srchsongTitle": { "S": rs[cur].songTitle },
+                            "srchidx": { "N": String(rs[cur].idx) }
                         };
-                        
-                        let processItemCallback = async function(perr, pdata){
-                            if(perr){
-                                if(perr.code == 'ProvisionedThroughputExceededException') {
-                                    // perr에 requestId가 있음.
-                                    // batch를 할 당시에 리턴값인 AWS request를 map에 저장해놓고 여기서 불러오면 파라메터를 전달할 수 있지 않을까?
-                                    // perr에 code, time, requestId, statusCode, retryable이 있는데 time은 에러 발생 시간이라 AWSRequest에 없고
-                                    // requestId도 왠지모르겠는데 AWSRequest에서 찾을 수가 없음
-                                    console.log('Excpetion occurred : ' + perr.code);
-                                    //later.push(params);
-                                    semaphore--;
-                                    console.log('semaphore : ' + semaphore);
-                                    //console.log('batch failed => ' + count);
-                                    //count++;
-                                    //dynamodb.batchWriteItem(params, processItemCallback);
-                                } else {
-                                    return reject(perr);
+                        req[table].push({PutRequest : { "Item": Item }});
+                        cur++;
+                        if(vari % 5000 == 0) vari = 0;
+                    }
+                    total = total >= 25 ? total -= 25 : 0;
+                    params = {
+                        RequestItems: req
+                    };
+                    
+                    let processItemCallback = async function(perr, pdata){
+                        if(perr){
+                            if(perr.code == 'ProvisionedThroughputExceededException') {
+                                // perr에 requestId가 있음.
+                                // batch를 할 당시에 리턴값인 AWS request를 map에 저장해놓고 여기서 불러오면 파라메터를 전달할 수 있지 않을까?
+                                // perr에 code, time, requestId, statusCode, retryable이 있는데 time은 에러 발생 시간이라 AWSRequest에 없고
+                                // requestId도 왠지모르겠는데 AWSRequest에서 찾을 수가 없음
+                                console.log('Excpetion occurred : ' + perr.code);
+                                later.push({requestId: perr.requestId});
+                                semaphore--;
+                                console.log('semaphore : ' + semaphore);
+                                console.log(later.length);
+                                count++;
+                                console.log('batch failed : ' + count);
+                                if(count == maxCount) {
+                                    let end = new Date();
+                                    console.log(end - start);
+                                    return resolve(end - start);
                                 }
                             } else {
-                                if(Object.keys(pdata.UnprocessedItems).length != 0){
-                                    console.log("unprocessed : " + pdata.UnprocessedItems + ", start rebatching");
-                                    await sleep(500);
-                                    dynamodb.batchWriteItem({RequestItems: pdata.UnprocessedItems}, processItemCallback);
-                                } else {
-                                    semaphore--;
-                                    console.log('semaphore : ' + semaphore);
-                                    count++;
-                                    console.log('batch success => ' + count);
-                                    if(count % 250 == 0) console.log("time consumed : " + (new Date() - start));
-                                    if(count == maxCount) {
-                                        let end = new Date();
-                                        console.log(end - start);
-                                        return resolve(true);
-                                    }
+                                return reject(perr);
+                            }
+                        } else {
+                            if(Object.keys(pdata.UnprocessedItems).length != 0){
+                                console.log("unprocessed : " + pdata.UnprocessedItems + ", start rebatching");
+                                await sleep(500);
+                                dynamodb.batchWriteItem({RequestItems: pdata.UnprocessedItems}, processItemCallback);
+                            } else {
+                                semaphore--;
+                                console.log('semaphore : ' + semaphore);
+                                count++;
+                                console.log('batch success => ' + count);
+                                if(count % 250 == 0) console.log("time consumed : " + (new Date() - start));
+                                if(count == maxCount) {
+                                    let end = new Date();
+                                    console.log(end - start);
+                                    return resolve(end - start);
                                 }
                             }
-                        };
-                        /*
-                        if(cur % 400 == 0) {
-                            await sleep(5000);
-                        } else if(cur % 15000 == 0) {
-                            await sleep(20000);
                         }
-                        */
-                        semaphore++;
-                        
-                        dynamodb.batchWriteItem(params, processItemCallback);
-                        if(semaphore == 16) console.log('stopped');
-                        while(semaphore >= 16){
-                            await sleep(200);
-                        }
-                        
+                    };
+                    
+                    semaphore++;
+                    dynamodb.batchWriteItem(params, processItemCallback);
+                    if(semaphore == 16) console.log('stopped');
+                    while(semaphore >= 16){
+                        await sleep(200);
                     }
-                    //fs.writeFileSync('../../migrationData/later.json', JSON.stringify(later), 'utf8');
+                    
+                }
 
             }
         }
@@ -532,15 +538,16 @@ const answerCallback = async (answer) => {
     } else if(arr[0] == 'import'){
         if(arr.length == 3){
             //const result = await importData(arr[1], arr[2], JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"})).length, 0);
-            
-            for(let m = 0 ; m < 1 ; m++){
-                const result = await importData(arr[1], arr[2],25000, m);
-                //const result = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
-                if(result) console.log('importing process terminated successfully');
-
+            let total = 0;
+            for(let m = 0 ; m < 10 ; m++){
+                //const result = await importData(arr[1], arr[2],25000, m);
+                const result = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
+                if(result) {
+                    console.log('importing process terminated successfully');
+                    total += result;
+                }
             }
-            if(result) console.log('importing process terminated successfully');
-            else console.log('error occurred while executing import process');        
+            console.log('total consumed time : ' + total);       
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> import [dest DB] [dest Table Name]');
