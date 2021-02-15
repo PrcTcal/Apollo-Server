@@ -6,7 +6,6 @@ const AWS = require('aws-sdk');
 const uuid = require('uuid');
 const readline = require('readline');
 const fs = require('fs');
-const cluster = require('cluster');
 
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 
@@ -72,8 +71,6 @@ const createTable = (db, table) => {
                 } else {
                     console.log('created table successfully: ' + JSON.stringify(data, null, 2));
                     console.log('waiting for creating table for a moment...');
-                    //await sleep(5000);
-                    //console.log('creating table process terminated');
                     dynamodb.waitFor('tableExists', { TableName: table }, (we, wd) => {
                         if(we){
                             console.error(we);
@@ -82,7 +79,6 @@ const createTable = (db, table) => {
                             return resolve(true);
                         }
                     });
-                    //return resolve(true);
                 }
             });    
         } 
@@ -118,8 +114,6 @@ const deleteTable = (db, table) => {
                 } else {
                     console.log('delete table success: ' + JSON.stringify(data, null, 2));
                     console.log('waiting for deleting table for a moment...');
-                    //await sleep(5000);
-                    //console.log('deleting table process terminated');
                     dynamodb.waitFor('tableNotExists', { TableName: table }, (we, wd) => {
                         if(we){
                             console.error(we);
@@ -128,14 +122,11 @@ const deleteTable = (db, table) => {
                             return resolve(true);
                         }
                     });
-                    //return resolve(true);
                 }
             });    
         }
     });
 }
-
-
 
 const count = (db, table) => {
     return new Promise(async (resolve, reject) => {
@@ -144,12 +135,6 @@ const count = (db, table) => {
             let music = await mongo_music.find();
             return resolve(music.length);
         } else {
-            let params = {
-                TableName: table,
-                KeyConditionExpression: "dummy = :dummy",
-                ExpressionAttributeValues: { ":dummy" : 0 }
-            };
-            let docClient = new AWS.DynamoDB.DocumentClient();
             let cnt = 0;
             let dynamo_music = Dynamoose.model(table, MusicModel.dynamo_schema);
             music = dynamo_music.scan();
@@ -163,67 +148,62 @@ const count = (db, table) => {
                 console.log(cnt);
             }
             console.log('total : ' + cnt);
-            /*
-            docClient.query(params, (err, data) => {
-                if(err){
-                    return reject(err);
-                } else {
-                    if(data.LastEvaluatedKey != null){
-                        params.ExclusiveStartKey = data.LastEvaluatedKey;
-                        docClient.query(params, (e, d) => {
-                            if(e){
-                                return reject(e);
-                            } else {
-                                return resolve(data.Count + d.Count);
-                            }
-                        });
-                    } else {
-                        return resolve(data.Count);
-                    }
-                }
-            });*/
+            
             return resolve(cnt);
         }
     });  
 }
 
+// mongoDB에 원본 데이터(tests 컬렉션) 갯수 뻥튀기용 더미 데이터 생성용 메서드
+const createDummyData = async (table) => {
+    mongo_music = Mongoose.model(table, MusicModel.mongo_schema);
+    music = await mongo_music.find().select('-_id');
+    let rs = [];
+            
+    // mongo 6808개 -> mongo 백만개 export할 때 => dummy data 생성용
+    for(let i = 0 ; i < 147 ; i++){
+        console.log(i);
+        for(let k = 0 ; k < 6808 && rs.length < 1000000 ; k++){
+            rs.push({
+                id: uuid.v4(),
+                Artist: music[k].Artist,
+                songTitle: music[k].songTitle,
+                info: music[k].info,
+                actv: music[k].actv,
+                idx: music[k].idx
+            });
+        }
+    }
+    console.log(rs.length);
+    try{
+        console.log("exported data size : " + rs.length);
+        if(rs.length == 0) return reject(new Error('There is No Data or Table'));
+        fs.writeFileSync('../../migrationData/export.json', JSON.stringify(rs), 'utf8');
+        console.log('writeFileSync completed');
+        return resolve(true);
+    } catch(e){
+        return reject(e);
+    }
+}
+
 const exportData = (src, table) => {
     return new Promise(async (resolve, reject) => {
+        let start = new Date();
         let params = {}, music, mongo_music, dynamo_music;
         let docClient = new AWS.DynamoDB.DocumentClient();
         let rs = [];
 
         if(src == 'mongo'){
-            mongo_music = await Mongoose.model(table, MusicModel.mongo_schema);
-            /*
-            music = await mongo_music.find().select('-_id');
-            
-            // mongo 6808개 -> mongo 백만개 export할 때
-            for(let i = 0 ; i < 147 ; i++){
-                console.log(i);
-                for(let k = 0 ; k < 6808 && rs.length < 1000000 ; k++){
-                    rs.push({
-                        id: uuid.v4(),
-                        Artist: music[k].Artist,
-                        songTitle: music[k].songTitle,
-                        info: music[k].info,
-                        actv: music[k].actv,
-                        idx: music[k].idx
-                    });
-                }
-            }
-            console.log(rs.length);
-            */
+            mongo_music = Mongoose.model(table, MusicModel.mongo_schema);
            
-            //rs = music;
             try{
-                for(let m = 0 ; m < 10 ; m++){
-                    console.log(m);
-                    music = await mongo_music.find().select('-_id').limit(100000).skip(100000*m);
-                    fs.writeFileSync(`../../migrationData/export${m}.json`, JSON.stringify(music), 'utf8');
+                for(let fileNum = 0 ; fileNum < 10 ; fileNum++){
+                    console.log(fileNum);
+                    music = await mongo_music.find().select('-_id').limit(100000).skip(100000 * fileNum);
+                    fs.writeFileSync(`../../tempData/export${fileNum}.json`, JSON.stringify(music), 'utf8');
                 }
                 console.log('writeFileSync completed');
-                return resolve(true);
+                return resolve((new Date() - start));
             } catch(e){
                 return reject(e);
             }
@@ -247,14 +227,23 @@ const exportData = (src, table) => {
                         }
                     } 
                 }
+                try{
+                    console.log("exported data size : " + rs.length);
+                    if(rs.length == 0) return reject(new Error('There is No Data or Table'));
+                    fs.writeFileSync('../../migrationData/export.json', JSON.stringify(rs), 'utf8');
+                    console.log('writeFileSync completed');
+                    return resolve(true);
+                } catch(e){
+                    return reject(e);
+                }
+
             } else {
-                
-                let start = new Date();
+                // using scan
                 params = {
                     TableName: table,
                     ProjectionExpression: "id, Artist, songTitle, info, idx, actv"
                 };
-
+                
                 let checking = (doc, par) => {
                     return new Promise((resolve, reject) => {
                         doc.scan(par, (err, data) => {
@@ -266,7 +255,7 @@ const exportData = (src, table) => {
                         });
                     });
                 }
-                let startKey = {}, c = 0, m = 0;
+                let startKey = {}, fileNum = 0;
                 while(startKey != null){
                     await checking(docClient, params).then(function(data){
                         if(data.Count == 0) return reject(new Error("There is No Data or Table"));
@@ -279,9 +268,9 @@ const exportData = (src, table) => {
                         for(let item of data.Items){
                             rs.push(item);
                             if(rs.length == 100000){
-                                console.log(m + " exported data size : " + rs.length);
+                                console.log(fileNum + " exported data size : " + rs.length);
                                 if(rs.length == 0) return reject(new Error('There is No Data or Table'));
-                                fs.writeFileSync(`../../tempData/export${m++}.json`, JSON.stringify(rs), 'utf8');
+                                fs.writeFileSync(`../../tempData/export${fileNum++}.json`, JSON.stringify(rs), 'utf8');
                                 rs = [];
                                 console.log('writeFileSync completed');
                             }
@@ -289,21 +278,61 @@ const exportData = (src, table) => {
                         console.log(rs.length);
                     });
                 } 
-                console.log('consumed time : ' + (new Date() - start));
-                return resolve(true);   
+                
+                /*
+                // using query
+                let checking = (doc, par) => {
+                    return new Promise((resolve, reject) => {
+                        doc.query(par, (err, data) => {
+                            if(err){
+                                return reject(err);
+                            } else {
+                                return resolve(data);
+                            }
+                        });
+                    });
+                }
+                let fileNum = 0;
+                for(let i = 0 ; i < 5000 ; i++){
+                    params = {
+                        TableName: 'test01-music',
+                        KeyConditionExpression: 'dummy = :dummy',
+                        ExpressionAttributeValues: {
+                            ':dummy' :  i
+                        },
+                        ProjectionExpression: "id, Artist, songTitle, info, idx, actv"
+                    };
+                    console.log(i);
+                    let startKey = {};
+                    while(startKey != null){
+                        await checking(docClient, params).then(function(data){
+                            if(data.Count == 0) return reject(new Error("There is No Data or Table"));
+                            if(data.LastEvaluatedKey != null) {
+                                params.ExclusiveStartKey = data.LastEvaluatedKey;
+                                startKey = data.LastEvaluatedKey;
+                            } else {
+                                startKey = null;
+                            }
+                            for(let item of data.Items){
+                                rs.push(item);
+                                if(rs.length == 100000){
+                                    console.log(fileNum + " exported data size : " + rs.length);
+                                    if(rs.length == 0) return reject(new Error('There is No Data or Table'));
+                                    fs.writeFileSync(`../../tempData/export${fileNum++}.json`, JSON.stringify(rs), 'utf8');
+                                    rs = [];
+                                    console.log('writeFileSync completed');
+                                }
+                                
+                            }
+                            //console.log(rs.length);
+                        });
+                    }
+                }
+                */
+
+                return resolve((new Date() - start));   
             }
         }
-        /*
-        try{
-            console.log("exported data size : " + rs.length);
-            if(rs.length == 0) return reject(new Error('There is No Data or Table'));
-            fs.writeFileSync('../../migrationData/export.json', JSON.stringify(rs), 'utf8');
-            console.log('writeFileSync completed');
-            return resolve(true);
-        } catch(e){
-            return reject(e);
-        }
-        */
     });
 }
 
@@ -313,23 +342,18 @@ const importData = (dest, table, total, m) => {
         console.log(total);
         let cur = 0, count = 0;
         let maxCount = total % 25 == 0 ? Math.floor(total / 25) : Math.floor(total / 25) + 1;
-        let params = {}, music, mongo_music, dynamo_music, retry = 0;
-        //let rs = JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"}));
-        //if(rs.length == 0) return reject(new Error("There is no Data or Table"));
+        let params = {}, music, mongo_music, dynamo_music;
+        if(total == 0) return reject(new Error("There is no Data or Table"));
+
         if(dest == 'mongo'){
             mongo_music = Mongoose.model(table, MusicModel.mongo_schema);
-            for(let i = 0 ; i < 100 ; i++){
-                console.log(i);
-                let arr = [];
-                for(let k = 0 ; k < 10000 ; k++){
-                    arr.push(rs[k + (i * 10000)]);
-                }
-                music = await mongo_music.insertMany(arr);
-            }
-            //music = await mongo_music.insertMany(rs);
+            let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
+            music = await mongo_music.insertMany(rs);
             if(music.length < rs.length) console.log('Data Migration did not completed well for some reason');
-            return resolve(true);
+            return resolve((new Date() - start));
+
         } else {
+
             if(dest == 'dynamoose'){
                 dynamo_music = Dynamoose.model(table, MusicModel.dynamo_schema);
                 console.log('executing batch...');
@@ -342,10 +366,10 @@ const importData = (dest, table, total, m) => {
                         rs[cur].srchidx = rs[cur].idx;
                         arr.push(rs[cur++]);
                     }
-                    
+
+                    /*
                     // 비동기식 batch
                     if(cur % 400 == 0) await sleep(5000);
-                    /*
                     let processItemCallback = async (perr, pdata) => {
                         if(perr){
                             return reject(perr);
@@ -383,8 +407,8 @@ const importData = (dest, table, total, m) => {
                         }
                     });
                     */
+
                     // 동기식 batch
-                    
                     music = await dynamo_music.batchPut(arr);
                     count++;
                     if(music.unprocessedItems.length > 0) console.log(music);
@@ -392,24 +416,26 @@ const importData = (dest, table, total, m) => {
                     
                 }
                 return resolve(true);
+
             } else {
                 AWS.events.on('retry', function(resp) {
                     if(resp.retryCount > 5) console.log(resp.error.requestId + ' - current retry count : ' + resp.retryCount);
                 });
+
                 let dynamodb = new AWS.DynamoDB();
-                let semaphore = 0;
+                let semaphore = 0, dummyVal = 0;
                 let later = [];
                 let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
                 cur = 0; 
                 count = 0;
                 console.log(`inserting export${m}.json===================================`);
-                let vari = 0;
                 while(total > 0){
                     let req = {}, Item = {};
                     req[table] = [];
+
                     for(let i = 0 ; i < (total > 25 ? 25 : total) ; i++){
                         Item = {
-                            "dummy": { "N": String(vari++) },
+                            "dummy": { "N": String(dummyVal++) },
                             "id": { "S": rs[cur].id },
                             "Artist": { "S": rs[cur].Artist },
                             "songTitle": { "S": rs[cur].songTitle },
@@ -427,8 +453,9 @@ const importData = (dest, table, total, m) => {
                         };
                         req[table].push({PutRequest : { "Item": Item }});
                         cur++;
-                        if(vari % 5000 == 0) vari = 0;
+                        if(dummyVal % 5000 == 0) dummyVal = 0;
                     }
+
                     total = total >= 25 ? total -= 25 : 0;
                     params = {
                         RequestItems: req
@@ -528,7 +555,10 @@ const answerCallback = async (answer) => {
     } else if(arr[0] == 'export'){
         if(arr.length == 3){
             const result = await exportData(arr[1], arr[2]);
-            if(result) console.log('exporting process terminated successfully');
+            if(result) {
+                console.log('consumed time : ' + result);
+                console.log('exporting process terminated successfully');
+            }
             else console.log('error occurred while executing export process');
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
@@ -537,10 +567,8 @@ const answerCallback = async (answer) => {
 
     } else if(arr[0] == 'import'){
         if(arr.length == 3){
-            //const result = await importData(arr[1], arr[2], JSON.parse(fs.readFileSync("../../migrationData/export.json", {encoding: "utf8"})).length, 0);
             let total = 0;
             for(let m = 0 ; m < 10 ; m++){
-                //const result = await importData(arr[1], arr[2],25000, m);
                 const result = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
                 if(result) {
                     console.log('importing process terminated successfully');
@@ -554,6 +582,8 @@ const answerCallback = async (answer) => {
         }
 
     } else if(arr[0] == 'migrate'){
+        console.log('This command is currently not available');
+        /*
         if(arr.length == 5){
             await createTable(arr[3], arr[4]);
             const ex = await exportData(arr[1], arr[2]);
@@ -571,8 +601,11 @@ const answerCallback = async (answer) => {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> migrate [source DB] [source Table Name] [Dest DB] [Dest Table Name]');
         }
-    
+        */
+
     } else if(arr[0] == 'copy') {
+        console.log('This command is currently not available');
+/*
         await createTable(arr[3], arr[4]);
 
         const ex = await exportData(arr[1], arr[2]);
@@ -583,18 +616,18 @@ const answerCallback = async (answer) => {
         const im = await importData(arr[3], arr[4], total);
         if(im) console.log('importing process terminated successfully');
         else console.log('error occurred while executing import process');
-    
+*/
     } else if(arr == 'exit'){
         r1.close();
         process.exit();
-    } else if(arr = 'ct'){
+    } else if(arr == 'ct'){
         for(let m = 0 ; m < 10 ; m++){
             let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
             console.log(rs.length);
         }
     }
-    r1.question('>> ', answerCallback);
 
+    r1.question('>> ', answerCallback);
 };
 
 try{
