@@ -6,6 +6,7 @@ const AWS = require('aws-sdk');
 const uuid = require('uuid');
 const readline = require('readline');
 const fs = require('fs');
+const ProgressBar = require('progress');
 
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 
@@ -186,7 +187,7 @@ const createDummyData = async (table) => {
     }
 }
 
-const exportData = (src, table) => {
+const exportData = (src, table, bar) => {
     return new Promise(async (resolve, reject) => {
         let start = new Date();
         let params = {}, music, mongo_music, dynamo_music;
@@ -267,15 +268,16 @@ const exportData = (src, table) => {
                         }
                         for(let item of data.Items){
                             rs.push(item);
+                            if(rs.length % 10000 == 0) bar.tick();
                             if(rs.length == 100000){
-                                console.log(fileNum + " exported data size : " + rs.length);
+                                //console.log(fileNum + " exported data size : " + rs.length);
                                 if(rs.length == 0) return reject(new Error('There is No Data or Table'));
                                 fs.writeFileSync(`../../tempData/export${fileNum++}.json`, JSON.stringify(rs), 'utf8');
                                 rs = [];
-                                console.log('writeFileSync completed');
+                                //console.log('writeFileSync completed');
                             }
                         }
-                        console.log(rs.length);
+                        //console.log(rs.length);
                     });
                 } 
                 
@@ -366,47 +368,6 @@ const importData = (dest, table, total, m) => {
                         rs[cur].srchidx = rs[cur].idx;
                         arr.push(rs[cur++]);
                     }
-
-                    /*
-                    // 비동기식 batch
-                    if(cur % 400 == 0) await sleep(5000);
-                    let processItemCallback = async (perr, pdata) => {
-                        if(perr){
-                            return reject(perr);
-                        } else {
-                            console.log(pdata);
-                            if(pdata.unprocessedItems.length != 0){
-                                console.log("unprocessed : " + pdata.unprocessedItems + ", start rebatching");
-                                //await sleep(Math.min(Math.pow(2, retry++), 500));
-                                await sleep(500);
-                                dynamo_music.batchPut(pdata.unprocessedItems, processItemCallback);
-                            } else {
-                                count++;
-                                console.log('batch success => ' + count);
-                                if(count == maxCount) return resolve(true);
-                            }
-                        }
-                    }
-                    dynamo_music.batchPut(arr, processItemCallback);
-                    
-                    music = dynamo_music.batchPut(arr, async (err, data) => {
-                        if(err){
-                            console.log('callback error');
-                            return reject(err);
-                        } else {
-                            console.log(data);
-                            if(data.unprocessedItems.length != 0){
-                                console.log('batch failed : ' + data);
-                                await sleep(500);
-                                dynamo_music.batchPut(data.unprocessedItems);
-                            } else {
-                                count++;
-                                console.log('batch success => ' + count);
-                                if(count == maxCount) return resolve(true);
-                            }
-                        }
-                    });
-                    */
 
                     // 동기식 batch
                     music = await dynamo_music.batchPut(arr);
@@ -517,12 +478,117 @@ const importData = (dest, table, total, m) => {
     })
 }
 
+
+
+const recurAdd = (param, field) => {
+    return new Promise((resolve, reject) => {
+        let json = {}
+        const getObject = (j, key, pp, m) => {
+            if(m < pp.length-1){
+                return getObject(j[key], pp[m], pp, (m+1));
+            } else {
+                return j[key];
+            }
+        }
+        const recurMapAddCallback = (answer) => {
+            let arr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
+            console.log(arr);
+            let map = arr[1].split('.');
+            console.log(map);
+            if(arr.length == 4){
+                if(arr[0] == "s"){
+                    getObject(json, map[0], map, 0)[arr[2]] = arr[3];
+                } else if(arr[0] == "n"){
+                    getObject(json, map[0], map, 0)[arr[2]] = arr[3];
+                } else if(arr[0] == "b"){
+                    getObject(json, map[0], map, 0)[arr[2]] = arr[3];
+                }
+                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurMapAddCallback);
+            } else if(arr.length == 3){
+                // info에 album, release가 있고, 그 안에 final이라는 object를 넣고 그 안에 다시 {goal : "gg"}를 넣어야함
+                //Object.assign(getObject(json, map[0], map, 0), new Object());
+                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurMapAddCallback);
+            } else if(arr == 'done'){
+                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurAddCallback);
+            }
+        };
+        const recurAddCallback = (answer) => {
+            let arr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
+            if(arr.length == 3){
+                if(arr[0] == "s"){
+                    json[arr[1]] = arr[2];
+                } else if(arr[0] == "n"){
+                    json[arr[1]] = arr[2];
+                } else if(arr[0] == "b"){
+                    json[arr[1]] = arr[2];
+                }
+                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurAddCallback);
+            } else if(arr.length == 2){
+                if(arr[0] == "m"){
+                    json[arr[1]] = {};
+                }
+                r1.question('[System] ' + arr[1] + '의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurMapAddCallback);
+            } else if(arr == 'done'){
+                return resolve(json);
+            }
+        };
+        
+        r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurAddCallback);
+        
+    });
+}
+
+const convert = (option) => {
+    return new Promise(async (resolve, reject) => {
+        let jsonArray = JSON.parse(fs.readFileSync('../../tempData/export0.json', 'utf8'));
+        console.log('read finished - item count : ' + jsonArray.length);
+        
+        let idx = 0;
+    
+        if(option == 'add'){
+            let json = await recurAdd();
+            json.id = uuid.v4();
+            console.log('json : ');
+            console.log(json);
+            return resolve(true);
+        } else if(option == 'edit'){
+            let tt = {
+                Artist: "qwe",
+                songTitle: "asd",
+                info: {
+                    album: "zvcxvz",
+                    release: "oejowgei"
+                }
+            };
+            let pp = ["info"];
+            let m = 0;
+            const getObject = (json, key) => {
+                if(m < pp.length-1){
+                    return getObject(json[key], pp[m++]);
+                } else {
+                    return json[key];
+                }
+            }
+            getObject(tt, pp[0])["final"] = "qwerty";
+            console.log(tt);
+            
+            
+            //console.log(tt);
+            
+        } else if(option == 'delete'){
+    
+        }
+    })
+    
+    //fs.writeFileSync(`../../tempData/export${fileNum++}.json`, JSON.stringify(rs), 'utf8');
+}
+
 const r1 = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
 });
 
-const answerCallback = async (answer) => {
+const answerCallback = async (answer) => {  
     let arr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
     console.log(arr);
 
@@ -554,7 +620,8 @@ const answerCallback = async (answer) => {
     
     } else if(arr[0] == 'export'){
         if(arr.length == 3){
-            const result = await exportData(arr[1], arr[2]);
+            const bar = new ProgressBar('Exporting - [:percent]', {total:100});
+            const result = await exportData(arr[1], arr[2], bar);
             if(result) {
                 console.log('consumed time : ' + result);
                 console.log('exporting process terminated successfully');
@@ -605,7 +672,7 @@ const answerCallback = async (answer) => {
 
     } else if(arr[0] == 'copy') {
         console.log('This command is currently not available');
-/*
+        /*
         await createTable(arr[3], arr[4]);
 
         const ex = await exportData(arr[1], arr[2]);
@@ -616,7 +683,7 @@ const answerCallback = async (answer) => {
         const im = await importData(arr[3], arr[4], total);
         if(im) console.log('importing process terminated successfully');
         else console.log('error occurred while executing import process');
-*/
+        */
     } else if(arr == 'exit'){
         r1.close();
         process.exit();
@@ -625,6 +692,13 @@ const answerCallback = async (answer) => {
             let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
             console.log(rs.length);
         }
+    } else if(arr == 'bar'){
+        const bar = new ProgressBar(':percent', {total:10});
+        await test(bar);
+        console.log('process terminated');
+    } else if(arr[0] == 'convert'){
+        let result = await convert(arr[1]);
+        console.log('convert result : ' + json);
     }
 
     r1.question('>> ', answerCallback);
@@ -656,3 +730,12 @@ try{
     console.error(e);
 }
 
+const test = (bar) => {
+    return new Promise(async (resolve, reject) => {
+        for(let i = 0 ; i < 10 ; i++){
+            await sleep(1000);
+            bar.tick();
+        }
+        return resolve(true);
+    })
+}
