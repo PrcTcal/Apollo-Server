@@ -7,6 +7,7 @@ const uuid = require('uuid');
 const readline = require('readline');
 const fs = require('fs');
 const ProgressBar = require('progress');
+const testModule = require('./testmodule');
 
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 
@@ -281,57 +282,6 @@ const exportData = (src, table, bar) => {
                     });
                 } 
                 
-                /*
-                // using query
-                let checking = (doc, par) => {
-                    return new Promise((resolve, reject) => {
-                        doc.query(par, (err, data) => {
-                            if(err){
-                                return reject(err);
-                            } else {
-                                return resolve(data);
-                            }
-                        });
-                    });
-                }
-                let fileNum = 0;
-                for(let i = 0 ; i < 5000 ; i++){
-                    params = {
-                        TableName: 'test01-music',
-                        KeyConditionExpression: 'dummy = :dummy',
-                        ExpressionAttributeValues: {
-                            ':dummy' :  i
-                        },
-                        ProjectionExpression: "id, Artist, songTitle, info, idx, actv"
-                    };
-                    console.log(i);
-                    let startKey = {};
-                    while(startKey != null){
-                        await checking(docClient, params).then(function(data){
-                            if(data.Count == 0) return reject(new Error("There is No Data or Table"));
-                            if(data.LastEvaluatedKey != null) {
-                                params.ExclusiveStartKey = data.LastEvaluatedKey;
-                                startKey = data.LastEvaluatedKey;
-                            } else {
-                                startKey = null;
-                            }
-                            for(let item of data.Items){
-                                rs.push(item);
-                                if(rs.length == 100000){
-                                    console.log(fileNum + " exported data size : " + rs.length);
-                                    if(rs.length == 0) return reject(new Error('There is No Data or Table'));
-                                    fs.writeFileSync(`../../tempData/export${fileNum++}.json`, JSON.stringify(rs), 'utf8');
-                                    rs = [];
-                                    console.log('writeFileSync completed');
-                                }
-                                
-                            }
-                            //console.log(rs.length);
-                        });
-                    }
-                }
-                */
-
                 return resolve((new Date() - start));   
             }
         }
@@ -387,6 +337,21 @@ const importData = (dest, table, total, m) => {
                 let semaphore = 0, dummyVal = 0;
                 let later = [];
                 let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
+                const getMap = (obj) => {
+                    let result = {};
+                    for(let mkey in obj){
+                        if(typeof(obj[mkey]) == 'string'){
+                            result[mkey] = { "S" : obj[mkey] };
+                        } else if(typeof(obj[mkey]) == 'number'){
+                            result[mkey] = { "N" : String(obj[mkey]) };
+                        } else if(typeof(obj[mkey]) == 'boolean'){
+                            result[mkey] = { "BOOL" : obj[mkey] };
+                        } else if(typeof(obj[mkey]) == 'object') {
+                            result[mkey] = { "M" : getMap(obj[mkey]) };
+                        }
+                    }
+                    return result;
+                }
                 cur = 0; 
                 count = 0;
                 console.log(`inserting export${m}.json===================================`);
@@ -395,6 +360,13 @@ const importData = (dest, table, total, m) => {
                     req[table] = [];
 
                     for(let i = 0 ; i < (total > 25 ? 25 : total) ; i++){
+                        Item = getMap(rs[cur]);
+                        Item["dummy"] = { "N": String(dummyVal++) };
+                        Item["srchArtist"] = { "S": rs[cur].Artist };
+                        Item["srchsongTitle"] = { "S": rs[cur].songTitle };
+                        Item["srchidx"] = { "N": String(rs[cur].idx) };
+                        
+                        /*
                         Item = {
                             "dummy": { "N": String(dummyVal++) },
                             "id": { "S": rs[cur].id },
@@ -412,6 +384,7 @@ const importData = (dest, table, total, m) => {
                             "srchsongTitle": { "S": rs[cur].songTitle },
                             "srchidx": { "N": String(rs[cur].idx) }
                         };
+                        */
                         req[table].push({PutRequest : { "Item": Item }});
                         cur++;
                         if(dummyVal % 5000 == 0) dummyVal = 0;
@@ -446,14 +419,14 @@ const importData = (dest, table, total, m) => {
                             }
                         } else {
                             if(Object.keys(pdata.UnprocessedItems).length != 0){
-                                console.log("unprocessed : " + pdata.UnprocessedItems + ", start rebatching");
+                                //console.log("unprocessed : " + pdata.UnprocessedItems + ", start rebatching");
                                 await sleep(500);
                                 dynamodb.batchWriteItem({RequestItems: pdata.UnprocessedItems}, processItemCallback);
                             } else {
                                 semaphore--;
-                                console.log('semaphore : ' + semaphore);
+                                //console.log('semaphore : ' + semaphore);
                                 count++;
-                                console.log('batch success => ' + count);
+                                //console.log('batch success => ' + count);
                                 if(count % 250 == 0) console.log("time consumed : " + (new Date() - start));
                                 if(count == maxCount) {
                                     let end = new Date();
@@ -466,7 +439,7 @@ const importData = (dest, table, total, m) => {
                     
                     semaphore++;
                     dynamodb.batchWriteItem(params, processItemCallback);
-                    if(semaphore == 16) console.log('stopped');
+                    //if(semaphore == 16) console.log('stopped');
                     while(semaphore >= 16){
                         await sleep(200);
                     }
@@ -479,108 +452,153 @@ const importData = (dest, table, total, m) => {
 }
 
 
-
-const recurAdd = (param, field) => {
+// 명령어로 입력하여 json object에 field 추가 및 값 수정하는 메서드
+// deprecated code
+const recurConvert = (json, option) => {
     return new Promise((resolve, reject) => {
-        let json = {}
-        const getObject = (j, key, pp, m) => {
-            if(m < pp.length-1){
-                return getObject(j[key], pp[m], pp, (m+1));
+        console.clear();
+        console.log('=============================================<< commands >>=============================================');
+        console.log('[type - m] [Field Name]                                            : add a single non-existing map field');
+        console.log('[type - s | n | b] [Field Name] [Field Value]                      : add string, number, bool type field');
+        console.log('[type - s | n | b] [Map Route] [Field Name] [Field Value]          : add string, number, bool type field in designated existing map field');
+        console.log('[type - m] [Map Route - ex) info.final.correct] [Field Type - s | n | b] [Field Name] [Field Value]');
+        console.log('                               : add string, number, bool type field in designated non-existing map field');
+        console.log('                                 both the last field in Map Route and adding Field Name should be non-existing field');
+        console.log('                                 contrary to all the other fields which in Map Route must be existing one');
+        console.log('done                                                               : terminating input process');
+        console.log('========================================================================================================\n');
+        const getObject = (jsonObject, key, mapRoute, idx, isMap) => {
+            if(isMap){
+                if(idx < mapRoute.length-2){
+                    return getObject(jsonObject[key], mapRoute[idx+1], mapRoute, (idx+1), isMap);
+                } else {
+                    return jsonObject[key];
+                }
             } else {
-                return j[key];
-            }
-        }
-        const recurMapAddCallback = (answer) => {
-            let arr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
-            console.log(arr);
-            let map = arr[1].split('.');
-            console.log(map);
-            if(arr.length == 4){
-                if(arr[0] == "s"){
-                    getObject(json, map[0], map, 0)[arr[2]] = arr[3];
-                } else if(arr[0] == "n"){
-                    getObject(json, map[0], map, 0)[arr[2]] = arr[3];
-                } else if(arr[0] == "b"){
-                    getObject(json, map[0], map, 0)[arr[2]] = arr[3];
+                if(idx < mapRoute.length-1){
+                    return getObject(jsonObject[key], mapRoute[idx+1], mapRoute, (idx+1), isMap);
+                } else {
+                    return jsonObject[key];
                 }
-                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurMapAddCallback);
-            } else if(arr.length == 3){
-                // info에 album, release가 있고, 그 안에 final이라는 object를 넣고 그 안에 다시 {goal : "gg"}를 넣어야함
-                //Object.assign(getObject(json, map[0], map, 0), new Object());
-                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurMapAddCallback);
-            } else if(arr == 'done'){
-                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurAddCallback);
-            }
+            }  
         };
-        const recurAddCallback = (answer) => {
-            let arr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
-            if(arr.length == 3){
-                if(arr[0] == "s"){
-                    json[arr[1]] = arr[2];
-                } else if(arr[0] == "n"){
-                    json[arr[1]] = arr[2];
-                } else if(arr[0] == "b"){
-                    json[arr[1]] = arr[2];
-                }
-                r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurAddCallback);
-            } else if(arr.length == 2){
-                if(arr[0] == "m"){
-                    json[arr[1]] = {};
-                }
-                r1.question('[System] ' + arr[1] + '의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurMapAddCallback);
-            } else if(arr == 'done'){
+        const recurMapAddCallback = (answer) => {
+            console.log(json);
+            let inputArr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
+            if(inputArr.length > 1) console.log(inputArr);
+            let map = inputArr[1].split('.');
+            if(inputArr == 'done'){
                 return resolve(json);
             }
+            if(inputArr.length == 4){
+                // 현존하는 map object에 S, N, B타입 데이터를 삽입할때
+                if(inputArr[0] == "s"){
+                    getObject(json, map[0], map, 0, false)[inputArr[2]] = inputArr[3];
+                } else if(inputArr[0] == "n"){
+                    getObject(json, map[0], map, 0, false)[inputArr[2]] = Number(inputArr[3]);
+                } else if(inputArr[0] == "b"){
+                    getObject(json, map[0], map, 0, false)[inputArr[2]] = inputArr[3].toLowerCase() == 'true' ? true : false;
+                }
+            } else if(inputArr.length == 5){
+                // 현존하는 map object에 M타입 데이터를 삽입할때
+                if(inputArr[0] == "m"){
+                    let temp = {};
+                    if(inputArr[2] == 's'){
+                        temp[inputArr[3]] = inputArr[4];
+                    } else if(inputArr[2] == 'n'){
+                        temp[inputArr[3]] = Number(inputArr[4]);
+                    } else if(inputArr[2] == 'b'){
+                        temp[inputArr[3]] = inputArr[4].toLowerCase() == 'true' ? true : false;;
+                    }
+                    getObject(json, map[0], map, 0, true)[map[map.length - 1]] = temp;
+                }
+            // depth 0에서 S, N, B 데이터를 추가할때
+            } else if(inputArr.length == 3){
+                if(inputArr[0] == "s"){
+                    json[inputArr[1]] = inputArr[2];
+                } else if(inputArr[0] == "n"){
+                    json[inputArr[1]] = Number(inputArr[2]);
+                } else if(inputArr[0] == "b"){
+                    json[inputArr[1]] = inputArr[2].toLowerCase() == "true" ? true : false;
+                }
+
+            // depth 0에서 M 데이터를 추가할때
+            } else if(inputArr.length == 2){
+                if(inputArr[0] == "m"){
+                    json[inputArr[1]] = {};
+                }
+            
+            }
+            console.log(json);
+            r1.question(`[System] ${option}할 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>`, recurMapAddCallback);
         };
         
-        r1.question('[System] 의 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>', recurAddCallback);
+        r1.question(`[System] ${option}할 항목을 입력하세요 : [type] [Field Name] [Field Value]. 입력을 중단하려면 done을 입력하세요.\n>>`, recurMapAddCallback);
         
     });
 }
 
-const convert = (option) => {
+const convert = (file, option) => {
     return new Promise(async (resolve, reject) => {
-        let jsonArray = JSON.parse(fs.readFileSync('../../tempData/export0.json', 'utf8'));
+        let jsonArray = JSON.parse(fs.readFileSync(`../../tempData/${file}.json`, 'utf8'));
         console.log('read finished - item count : ' + jsonArray.length);
-        
-        let idx = 0;
-    
+        const bar = new ProgressBar(':percent', {total:100});
+        let output = [];
+        let progress = 0;
+        for(let json of jsonArray){
+            if(option == 'add') output.push(testModule.addFunc(json));
+            if(option == 'edit') output.push(testModule.editFunc(json));
+            if(option == 'delete') output.push(testModule.deleteFunc(json));
+
+            progress++;
+            if(progress % 1000 == 0) bar.tick();
+        }
+
+        fs.writeFileSync(`../../tempData/${file}.json`, JSON.stringify(output), 'utf8');
+        console.log(`converted ${file}.json successfully`);
+        return resolve(true);
+        /*
+        // json array 내 특정 object에 대한 add/edit/delete 기능 수행
+        // deprecated code
         if(option == 'add'){
-            let json = await recurAdd();
+            let json = await recurConvert(new Object(), "추가");
             json.id = uuid.v4();
             console.log('json : ');
             console.log(json);
+            jsonArray.push(json);
+            fs.writeFileSync(`../../tempData/export1.json`, JSON.stringify(jsonArray), 'utf8');
+            console.log('new item added successfully in export.json');
             return resolve(true);
         } else if(option == 'edit'){
-            let tt = {
-                Artist: "qwe",
-                songTitle: "asd",
-                info: {
-                    album: "zvcxvz",
-                    release: "oejowgei"
-                }
-            };
-            let pp = ["info"];
-            let m = 0;
-            const getObject = (json, key) => {
-                if(m < pp.length-1){
-                    return getObject(json[key], pp[m++]);
-                } else {
-                    return json[key];
+            let json;
+            for(let item of jsonArray){
+                if(item.id == id){
+                    json = item;
+                    break;
                 }
             }
-            getObject(tt, pp[0])["final"] = "qwerty";
-            console.log(tt);
-            
-            
-            //console.log(tt);
-            
+            console.log(json);
+            json = await recurConvert(json, "수정");
+            console.log('json : ');
+            console.log(json);
+            fs.writeFileSync(`../../tempData/export1.json`, JSON.stringify(jsonArray), 'utf8');
+            console.log('new item added successfully in export.json');
+            return resolve(true);
         } else if(option == 'delete'){
-    
+            const findItem = jsonArray.find(function(item){
+                return item.id == id;
+            });
+            const idx = jsonArray.indexOf(findItem);
+            jsonArray.splice(idx, 1);
+        
+            fs.writeFileSync(`../../tempData/export1.json`, JSON.stringify(jsonArray), 'utf8');
+            console.log('new item added successfully in export.json');
+            return resolve(true);
+            
         }
-    })
-    
-    //fs.writeFileSync(`../../tempData/export${fileNum++}.json`, JSON.stringify(rs), 'utf8');
+        */
+        
+    });
 }
 
 const r1 = readline.createInterface({
@@ -590,59 +608,69 @@ const r1 = readline.createInterface({
 
 const answerCallback = async (answer) => {  
     let arr = answer.indexOf(' ') > 0 ? answer.split(' ') : answer;
+    let result, operation;
     console.log(arr);
 
 
     if(arr[0] == 'count'){
+        operation = 'count';
         if(arr.length == 3){
-            const cnt = await count(arr[1], arr[2]);
-            if(cnt > 0) console.log('total count : ' + cnt);
+            result = await count(arr[1], arr[2]);
+            if(cnt > 0) console.log('total count : ' + result);
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> count [target DB] [Table Name]');
         }
 
     } else if(arr[0] == 'create'){
+        operation = 'create';
         if(arr.length == 3){
-            await createTable(arr[1], arr[2]);
+            result = await createTable(arr[1], arr[2]);
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> create [target DB] [Table Name]');
         }        
     
     } else if(arr[0] == 'delete'){
+        operation = 'delete';
         if(arr.length == 3){
-            await deleteTable(arr[1], arr[2]);
+            result = await deleteTable(arr[1], arr[2]);
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> delete [target DB] [Table Name]');
         } 
     
     } else if(arr[0] == 'export'){
+        operation = 'export';
         if(arr.length == 3){
             const bar = new ProgressBar('Exporting - [:percent]', {total:100});
-            const result = await exportData(arr[1], arr[2], bar);
+            result = await exportData(arr[1], arr[2], bar);
+            
             if(result) {
-                console.log('consumed time : ' + result);
+                console.log('consumed time : ' + result + 'ms');
                 console.log('exporting process terminated successfully');
             }
             else console.log('error occurred while executing export process');
+            
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> export [source DB] [source Table Name]');
         }
 
     } else if(arr[0] == 'import'){
+        operation = 'import';
         if(arr.length == 3){
             let total = 0;
-            for(let m = 0 ; m < 10 ; m++){
-                const result = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
-                if(result) {
+            for(let m = 1 ; m < 2 ; m++){
+                const time = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
+                
+                if(time) {
                     console.log('importing process terminated successfully');
-                    total += result;
+                    result += time;
                 }
+                
             }
-            console.log('total consumed time : ' + total);       
+            console.log('total consumed time : ' + result + 'ms');       
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> import [dest DB] [dest Table Name]');
@@ -697,9 +725,20 @@ const answerCallback = async (answer) => {
         await test(bar);
         console.log('process terminated');
     } else if(arr[0] == 'convert'){
-        let result = await convert(arr[1]);
-        console.log('convert result : ' + json);
+        operation = 'convert';
+        if(arr.length == 2) result = await convert(arr[1]);
+        if(arr.length == 3) result = await convert(arr[1], arr[2]);
     }
+
+    
+    console.log('=============================================<< commands >>=============================================');
+    console.log('create [DB type] [Table name]                  : creating table');
+    console.log('count [DB type] [Table name]                   : return total count of data in table');
+    console.log('export [source DB type] [Table name]           : retrieve data from source DB and save it as JSON file');
+    console.log('import [destination DB type] [Table name]      : read data from JSON file and insert it into destination DB');
+    console.log('convert [File Name] [add | edit | delete]      : add | edit | delete items in json file');
+    console.log('exit                                           : terminating CLI process');
+    console.log('========================================================================================================\n');
 
     r1.question('>> ', answerCallback);
 };
@@ -720,11 +759,12 @@ try{
     var ddb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
     console.log('successfully connected to dynamoDB\n');
     console.log('=============================================<< commands >>=============================================');
-    console.log('create [DB type] [Table name]              : creating table');
-    console.log('count [DB type] [Table name]               : return total count of data in table');
-    console.log('export [source DB type] [Table name]       : retrieve data from source DB and save it as JSON file');
-    console.log('import [destination DB type] [Table name]  : read data from JSON file and insert it into destination DB');
-    console.log('exit                                       : terminating CLI process');
+    console.log('create [DB type] [Table name]                  : creating table');
+    console.log('count [DB type] [Table name]                   : return total count of data in table');
+    console.log('export [source DB type] [Table name]           : retrieve data from source DB and save it as JSON file');
+    console.log('import [destination DB type] [Table name]      : read data from JSON file and insert it into destination DB');
+    console.log('convert [add | edit | delete] [id : optional]  : add | edit | delete item in export.json file');
+    console.log('exit                                           : terminating CLI process');
     console.log('========================================================================================================\n');
 } catch(e) {
     console.error(e);
