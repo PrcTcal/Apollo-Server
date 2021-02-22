@@ -5,6 +5,10 @@ const addFunc = (json) => {
     } else {
         json['upper'] = true;
     }
+
+    if(json.idx < 1000){
+        json['info']['final'] = {correct : true};
+    }
     return json;
 }
 

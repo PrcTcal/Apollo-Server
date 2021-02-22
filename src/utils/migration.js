@@ -243,7 +243,7 @@ const exportData = (src, table, bar) => {
                 // using scan
                 params = {
                     TableName: table,
-                    ProjectionExpression: "id, Artist, songTitle, info, idx, actv"
+                    //ProjectionExpression: "id, Artist, songTitle, info, idx, actv"
                 };
                 
                 let checking = (doc, par) => {
@@ -268,6 +268,10 @@ const exportData = (src, table, bar) => {
                             startKey = null;
                         }
                         for(let item of data.Items){
+                            delete item.dummy;
+                            delete item.srchArtist;
+                            delete item.srchsongTitle;
+                            delete item.srchidx;
                             rs.push(item);
                             if(rs.length % 10000 == 0) bar.tick();
                             if(rs.length == 100000){
@@ -336,7 +340,7 @@ const importData = (dest, table, total, m) => {
                 let dynamodb = new AWS.DynamoDB();
                 let semaphore = 0, dummyVal = 0;
                 let later = [];
-                let rs = JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"}));
+                let rs = JSON.parse(fs.readFileSync(`../../tempData/export${m}.json`, {encoding: "utf8"}));
                 const getMap = (obj) => {
                     let result = {};
                     for(let mkey in obj){
@@ -360,31 +364,14 @@ const importData = (dest, table, total, m) => {
                     req[table] = [];
 
                     for(let i = 0 ; i < (total > 25 ? 25 : total) ; i++){
+                        
                         Item = getMap(rs[cur]);
+                        // partition key와 LSI는 Item객체에 직접 할당을 해줘야한다(table schema).
                         Item["dummy"] = { "N": String(dummyVal++) };
                         Item["srchArtist"] = { "S": rs[cur].Artist };
                         Item["srchsongTitle"] = { "S": rs[cur].songTitle };
                         Item["srchidx"] = { "N": String(rs[cur].idx) };
                         
-                        /*
-                        Item = {
-                            "dummy": { "N": String(dummyVal++) },
-                            "id": { "S": rs[cur].id },
-                            "Artist": { "S": rs[cur].Artist },
-                            "songTitle": { "S": rs[cur].songTitle },
-                            "info": { 
-                                "M": {
-                                    "album": { "S": rs[cur].info.album },
-                                    "release": { "S": rs[cur].info.release }
-                                } 
-                            },
-                            "actv": { "BOOL": rs[cur].actv },
-                            "idx": { "N": String(rs[cur].idx) },
-                            "srchArtist": { "S": rs[cur].Artist },
-                            "srchsongTitle": { "S": rs[cur].songTitle },
-                            "srchidx": { "N": String(rs[cur].idx) }
-                        };
-                        */
                         req[table].push({PutRequest : { "Item": Item }});
                         cur++;
                         if(dummyVal % 5000 == 0) dummyVal = 0;
@@ -424,9 +411,9 @@ const importData = (dest, table, total, m) => {
                                 dynamodb.batchWriteItem({RequestItems: pdata.UnprocessedItems}, processItemCallback);
                             } else {
                                 semaphore--;
-                                //console.log('semaphore : ' + semaphore);
+                                console.log('semaphore : ' + semaphore);
                                 count++;
-                                //console.log('batch success => ' + count);
+                                console.log('batch success => ' + count);
                                 if(count % 250 == 0) console.log("time consumed : " + (new Date() - start));
                                 if(count == maxCount) {
                                     let end = new Date();
@@ -538,13 +525,14 @@ const recurConvert = (json, option) => {
     });
 }
 
-const convert = (file, option) => {
+const convert = (fileNum, option) => {
     return new Promise(async (resolve, reject) => {
-        let jsonArray = JSON.parse(fs.readFileSync(`../../tempData/${file}.json`, 'utf8'));
+        let jsonArray = JSON.parse(fs.readFileSync(`../../tempData/export${fileNum}.json`, 'utf8'));
         console.log('read finished - item count : ' + jsonArray.length);
         const bar = new ProgressBar(':percent', {total:100});
         let output = [];
         let progress = 0;
+
         for(let json of jsonArray){
             if(option == 'add') output.push(testModule.addFunc(json));
             if(option == 'edit') output.push(testModule.editFunc(json));
@@ -554,49 +542,9 @@ const convert = (file, option) => {
             if(progress % 1000 == 0) bar.tick();
         }
 
-        fs.writeFileSync(`../../tempData/${file}.json`, JSON.stringify(output), 'utf8');
-        console.log(`converted ${file}.json successfully`);
+        fs.writeFileSync(`../../tempData/export${fileNum}.json`, JSON.stringify(output), 'utf8');
+        console.log(`converted export${fileNum}.json successfully`);
         return resolve(true);
-        /*
-        // json array 내 특정 object에 대한 add/edit/delete 기능 수행
-        // deprecated code
-        if(option == 'add'){
-            let json = await recurConvert(new Object(), "추가");
-            json.id = uuid.v4();
-            console.log('json : ');
-            console.log(json);
-            jsonArray.push(json);
-            fs.writeFileSync(`../../tempData/export1.json`, JSON.stringify(jsonArray), 'utf8');
-            console.log('new item added successfully in export.json');
-            return resolve(true);
-        } else if(option == 'edit'){
-            let json;
-            for(let item of jsonArray){
-                if(item.id == id){
-                    json = item;
-                    break;
-                }
-            }
-            console.log(json);
-            json = await recurConvert(json, "수정");
-            console.log('json : ');
-            console.log(json);
-            fs.writeFileSync(`../../tempData/export1.json`, JSON.stringify(jsonArray), 'utf8');
-            console.log('new item added successfully in export.json');
-            return resolve(true);
-        } else if(option == 'delete'){
-            const findItem = jsonArray.find(function(item){
-                return item.id == id;
-            });
-            const idx = jsonArray.indexOf(findItem);
-            jsonArray.splice(idx, 1);
-        
-            fs.writeFileSync(`../../tempData/export1.json`, JSON.stringify(jsonArray), 'utf8');
-            console.log('new item added successfully in export.json');
-            return resolve(true);
-            
-        }
-        */
         
     });
 }
@@ -661,16 +609,16 @@ const answerCallback = async (answer) => {
         operation = 'import';
         if(arr.length == 3){
             let total = 0;
-            for(let m = 1 ; m < 2 ; m++){
-                const time = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../migrationData/export${m}.json`, {encoding: "utf8"})).length, m);
+            for(let m = 0 ; m < 10 ; m++){
+                const time = await importData(arr[1], arr[2],JSON.parse(fs.readFileSync(`../../tempData/export${m}.json`, {encoding: "utf8"})).length, m);
                 
                 if(time) {
                     console.log('importing process terminated successfully');
-                    result += time;
+                    total += time;
                 }
                 
             }
-            console.log('total consumed time : ' + result + 'ms');       
+            console.log('total consumed time : ' + total + 'ms');       
         } else {
             console.log('명령어 형식이 올바르지 않습니다.');
             console.log('=> import [dest DB] [dest Table Name]');
@@ -726,8 +674,10 @@ const answerCallback = async (answer) => {
         console.log('process terminated');
     } else if(arr[0] == 'convert'){
         operation = 'convert';
-        if(arr.length == 2) result = await convert(arr[1]);
-        if(arr.length == 3) result = await convert(arr[1], arr[2]);
+        for(let i = 0 ; i < 10 ; i++){
+            result = await convert(i, arr[1]);
+        }
+        
     }
 
     
