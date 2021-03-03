@@ -1,7 +1,9 @@
 # Apollo-Server
 
-<br>
-# Contents<br><br>
-1. Apollo + GraphQL + MongoDB + DynamoDB<br>
+- Apollo + GraphQL + MongoDB + DynamoDB
+
+# Contents
+
+1. Apollo server
 2. Migration CLI using node.js<br>
 3. Migration tools using python
